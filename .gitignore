@@ -1,0 +1,23 @@
+# Logs
+logs/
+*.log.*
+
+# MacOS
+.DS_Store
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Go build artifacts
+megga-backend
+*.exe
+*.out
+
+# Environment variables
+.env
