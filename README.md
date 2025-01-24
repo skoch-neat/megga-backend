@@ -114,12 +114,12 @@ The server will start at `http://localhost:8080` by default. This setting can be
 ### **Migrate the Database**
 To apply schema migrations, run:
 
-    go run devutils/migrate.go
+    go run cmd/devutils/main.go --migrate
 
 ### **Seed the Database**
 To populate the database with sample data, run:
 
-    go run devutils/seed.go
+    go run cmd/devutils/main.go --seed
 
 ### **Note**
 - Both migration and seeding scripts are for development purposes only and should not be run in production.
