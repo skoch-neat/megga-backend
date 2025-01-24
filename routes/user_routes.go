@@ -4,21 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"megga-backend/models"
-	"megga-backend/services"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func RegisterUserRoutes(router *mux.Router) {
-	router.HandleFunc("/users", GetUsers).Methods("GET")
+// RegisterUserRoutes registers user-related routes
+func RegisterUserRoutes(router *mux.Router, db *pgxpool.Pool) {
+	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		GetUsers(w, r, db)
+	}).Methods("GET")
 }
 
-func GetUsers(w http.ResponseWriter, r *http.Request) {
+// GetUsers handles the retrieval of user data
+func GetUsers(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) {
 	var users []models.User
 
-	// Query the database using services.DB
-	rows, err := services.DB.Query(context.Background(), "SELECT user_id, email, first_name, last_name FROM users")
+	// Query the database
+	rows, err := db.Query(context.Background(), "SELECT user_id, email, first_name, last_name FROM users")
 	if err != nil {
 		http.Error(w, "Database query error: "+err.Error(), http.StatusInternalServerError)
 		return

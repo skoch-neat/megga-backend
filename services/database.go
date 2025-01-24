@@ -11,14 +11,10 @@ import (
 var DB *pgxpool.Pool
 
 func InitDB() {
-	dsn := os.Getenv("DATABASE_URI")
-	if dsn == "" {
-		log.Fatal("DATABASE_URI environment variable is not set")
-	}
-	var err error
-	DB, err = pgxpool.New(context.Background(), dsn)
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v", err)
-	}
-	log.Println("Connected to the database!")
+    dsn := os.Getenv("DATABASE_URI")
+    var err error
+    DB, err = pgxpool.New(context.Background(), dsn)
+    if err != nil {
+        log.Fatalf("Unable to connect to the database: %v", err)
+    }
 }
