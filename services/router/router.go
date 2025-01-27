@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"megga-backend/handlers"
+	"megga-backend/middleware"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/cors"
 )
 
 // Config holds the dynamic configuration for middleware
@@ -39,32 +39,6 @@ func loadConfig() (*Config, error) {
 	return cfg, nil
 }
 
-// cspMiddleware adds Content Security Policy headers dynamically
-func cspMiddleware(cfg *Config) mux.MiddlewareFunc {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			csp := fmt.Sprintf(`
-				default-src 'self';
-				connect-src 'self' %s %s %s %s %s;
-			`, cfg.FrontendURL, cfg.CognitoDomain, cfg.IDPURL, cfg.TokenURL, cfg.APIBaseURL)
-			w.Header().Set("Content-Security-Policy", csp)
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// corsMiddleware sets up CORS configuration
-func corsMiddleware(cfg *Config) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return cors.New(cors.Options{
-			AllowedOrigins:   []string{cfg.FrontendURL}, // Allow requests from the frontend
-			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
-			AllowedHeaders:   []string{"Content-Type", "Authorization"},
-			AllowCredentials: true,
-		}).Handler(next)
-	}
-}
-
 // InitRouter initializes the router with API routes and middleware
 func InitRouter(db *pgxpool.Pool) (http.Handler, error) {
 	// Load configuration
@@ -73,7 +47,16 @@ func InitRouter(db *pgxpool.Pool) (http.Handler, error) {
 		return nil, err
 	}
 
+	// Create the main router
 	router := mux.NewRouter()
+
+	// Handle OPTIONS preflight requests globally
+	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", cfg.FrontendURL)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK) // Respond with 200 OK for preflight
+	})
 
 	// Register API routes
 	apiRouter := router.PathPrefix("/api").Subrouter()
@@ -87,9 +70,12 @@ func InitRouter(db *pgxpool.Pool) (http.Handler, error) {
 		}
 	}).Methods("GET", "POST")
 
-	// Apply CSP middleware
-	apiRouter.Use(cspMiddleware(cfg))
+	// Apply middleware
+	router.Use(middleware.LoggingMiddleware)           // Logs all requests globally
+	router.Use(middleware.CORSConfig(cfg.FrontendURL)) // Handles CORS globally
+	router.Use(middleware.CSPMiddleware(
+		cfg.CognitoDomain, cfg.IDPURL, cfg.TokenURL, cfg.APIBaseURL, cfg.FrontendURL,
+	)) // Handles CSP globally
 
-	// Apply CORS middleware
-	return corsMiddleware(cfg)(router), nil
+	return router, nil
 }
