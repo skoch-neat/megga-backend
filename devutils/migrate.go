@@ -3,13 +3,13 @@ package devutils
 import (
 	"context"
 	"log"
-	"megga-backend/services"
+	"megga-backend/services/database"
 )
 
 // MigrateDB runs database schema migrations.
 func MigrateDB() {
 	// Use the global database connection pool from services
-	db := services.DB
+	db := db.DB
 
 	migrations := map[string]string{
 		"Creating User table": `CREATE TABLE IF NOT EXISTS users (
@@ -34,10 +34,11 @@ func MigrateDB() {
 		"Creating Data table": `CREATE TABLE IF NOT EXISTS data (
 			data_id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
+			series_id VARCHAR(255) NOT NULL,
 			type VARCHAR(255) NOT NULL,
 			unit VARCHAR(50),
 			previous_value FLOAT,
-			updated_value FLOAT,
+			latest_value FLOAT,
 			last_updated TIMESTAMP,
 			update_interval_in_days INT
 		)`,

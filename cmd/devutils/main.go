@@ -4,11 +4,13 @@ import (
 	"flag"
 	"log"
 	"megga-backend/devutils"
-	"megga-backend/services"
+	"megga-backend/services/database"
+	"megga-backend/services/env"
 )
 
 func main() {
-	services.LoadEnv()
+	env.LoadEnv()
+	env.ValidateEnv()
 
 	// Parse flags to determine action
 	migrate := flag.Bool("migrate", false, "Run database migrations")
@@ -16,7 +18,7 @@ func main() {
 	flag.Parse()
 
 	// Initialize database connection
-	services.InitDB()
+	db.InitDB()
 
 	if *migrate {
 		log.Println("Running migrations...")

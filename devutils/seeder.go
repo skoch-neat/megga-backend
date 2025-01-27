@@ -3,7 +3,7 @@ package devutils
 import (
 	"context"
 	"log"
-	"megga-backend/services"
+	"megga-backend/services/database"
 )
 
 // SeedDB seeds the database with test data.
@@ -17,9 +17,9 @@ func SeedDB() {
 			('rep1@example.com', 'Jane', 'Doe', 'Representative'),
 			('rep2@example.com', 'John', 'Smith', 'Governor');`,
 
-		"Inserting Data": `INSERT INTO data (name, type, unit, previous_value, updated_value, last_updated, update_interval_in_days) VALUES 
-			('Eggs', 'Good', 'USD per dozen', 3.25, 3.50, NOW(), 30),
-			('Inflation', 'Indicator', '%', 2.5, 2.8, NOW(), 30);`,
+		"Inserting Data": `INSERT INTO data (name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days) VALUES 
+			('Eggs', 'APU0000708111', 'Good', 'USD per dozen', 3.25, 3.50, NOW(), 30),
+			('Inflation', 'LEU0252881600', 'Indicator', '%', 2.5, 2.8, NOW(), 30);`,
 
 		"Inserting Thresholds": `INSERT INTO thresholds (data_id, threshold_value, created_at) VALUES 
 			(1, 5.0, NOW()),
@@ -38,7 +38,7 @@ func SeedDB() {
 
 	for description, query := range seeds {
 		log.Printf("%s...", description)
-		_, err := services.DB.Exec(context.Background(), query)
+		_, err := db.DB.Exec(context.Background(), query)
 		if err != nil {
 			log.Printf("Error seeding database: %v\n", err)
 		}

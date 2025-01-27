@@ -73,7 +73,14 @@ Copy the `.env.example` file to create your `.env` file:
 
     cp .env.example .env
 
-Update DATABASE_URI in the `.env` file with your postgres username and password.
+Variables expected in the .env:
+- DATABASE_URI=postgres://username:password@localhost:5432/megga_dev
+- PORT=8080
+- COGNITO_CLIENT_ID=your-cognito-client-id
+- BLS_API_KEY=your-bls-api-key
+- FRED_API_KEY=your-fred-api-key
+
+Update the variables with your information as indicated.
 
 ---
 
@@ -82,12 +89,12 @@ Update DATABASE_URI in the `.env` file with your postgres username and password.
 #### **Run Migrations**
 To apply schema migrations, run:
 
-    go run devutils/migrate.go
+    go run cmd/devutils/main.go --migrate
 
 #### **Seed the Database**
 To populate the database with sample data, run:
 
-    go run devutils/seed.go
+    go run cmd/devutils/main.go --seed
 
 **Note**: These utilities are for development purposes only and should not be used in production.
 
@@ -98,7 +105,7 @@ Start the server with the following command:
 
     go run main.go
 
-The server will start at `http://localhost:8080` by default. This setting can be changed in the `.env` file.
+The server will start at `http://localhost:8080` by default. The port can be changed in the `.env` file.
 
 ---
 
@@ -122,7 +129,7 @@ To populate the database with sample data, run:
     go run cmd/devutils/main.go --seed
 
 ### **Note**
-- Both migration and seeding scripts are for development purposes only and should not be run in production.
+- Migration and seeding scripts are for development purposes only and should not be run in production.
 
 ---
 
