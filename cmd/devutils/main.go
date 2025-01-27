@@ -17,8 +17,20 @@ func main() {
 	seed := flag.Bool("seed", false, "Seed the database with test data")
 	flag.Parse()
 
-	// Initialize database connection
+	// Ensure at least one flag is provided
+	if !*migrate && !*seed {
+		log.Println("No action specified. Use --migrate or --seed.")
+		return
+	}
+
+	// Initialize the database connection
 	db.InitDB()
+	defer func() {
+		// Close the database connection
+		if db.DB != nil {
+			db.DB.Close()
+		}
+	}()
 
 	if *migrate {
 		log.Println("Running migrations...")

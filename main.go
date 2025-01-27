@@ -20,7 +20,10 @@ func main() {
 	defer db.DB.Close()
 
 	// Initialize the router
-	router := router.InitRouter(db.DB)
+	router, err := router.InitRouter(db.DB)
+	if err != nil {
+		log.Fatalf("Failed to initialize router: %v", err)
+	}
 
 	// Start the server
 	port := os.Getenv("PORT")

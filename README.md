@@ -13,6 +13,8 @@ The MEGGA backend is built with Go and provides APIs for user authentication, th
 - **RESTful API**: Built with Gorilla Mux for structured routing.
 - **PostgreSQL Database**: Reliable persistent storage.
 - **Environment Configurations**: Customizable via `.env` files.
+- **Content Security Policy (CSP)**: Configurable for API security.
+- **Cross-Origin Resource Sharing (CORS)**: Allows frontend-backend communication.
 - **Development Utilities**: Database migration and seeding for testing.
 - **Extensible Design**: Easily adaptable for future needs.
 
@@ -34,6 +36,7 @@ megga-backend/
 - routes/
   - user_routes.go (Handlers for user-related API endpoints)
 - services/
+  - env.go (Environment variable handling)
   - database.go (Database connection logic)
   - router.go (Router initialization logic)
 - .env.example (Environment variable template)
@@ -73,14 +76,29 @@ Copy the `.env.example` file to create your `.env` file:
 
     cp .env.example .env
 
-Variables expected in the .env:
-- DATABASE_URI=postgres://username:password@localhost:5432/megga_dev
-- PORT=8080
-- COGNITO_CLIENT_ID=your-cognito-client-id
-- BLS_API_KEY=your-bls-api-key
-- FRED_API_KEY=your-fred-api-key
+#### Variables expected in the `.env`:
 
-Update the variables with your information as indicated.
+- **Database Configuration**:
+  - `DATABASE_URI=postgres://<username>:<password>@<host>:<port>/<database_name>`
+
+- **Server Configuration**:
+  - `PORT=8080`
+
+- **Application URLs**:
+  - `API_BASE_URL=<backend_url>` (e.g., `http://localhost:8080` for local development or `https://api.yourdomain.com` for production)
+  - `FRONTEND_URL=<frontend_url>` (e.g., `http://localhost:5173` for local development or `https://www.yourdomain.com` for production)
+
+- **Cognito Configuration**:
+  - `COGNITO_CLIENT_ID=<your_cognito_client_id>`
+  - `COGNITO_DOMAIN=https://<your_cognito_domain>`
+  - `COGNITO_IDP_URL=https://<your_cognito_idp_url>`
+  - `COGNITO_TOKEN_URL=https://<your_cognito_token_url>`
+
+- **API Keys**:
+  - `BLS_API_KEY=<your_bls_api_key>`
+  - `FRED_API_KEY=<your_fred_api_key>`
+
+**Tip**: The `.env.example` file contains placeholders for all required variables. Copy it to `.env` and replace placeholders with your actual configuration values.
 
 ---
 
@@ -100,6 +118,17 @@ To populate the database with sample data, run:
 
 ---
 
+## **Security**
+
+### **Environment Variables**
+Keep your `.env` file secure and do not commit it to version control. Use `.env.example` as a template for collaborators.
+
+### **CSP and CORS**
+- CSP headers are dynamically configured in `router.go` to secure API responses.
+- CORS middleware is enabled to allow requests from the frontend.
+
+---
+
 ### **6. Run the Server**
 Start the server with the following command:
 
@@ -112,7 +141,8 @@ The server will start at `http://localhost:8080` by default. The port can be cha
 ## **API Endpoints**
 
 ### **User Routes**
-- `GET /users`: Retrieve a list of all users.
+- `GET /api/users`: Retrieve a list of all users.
+- `POST /api/users`: Create a new user.
 
 ---
 
