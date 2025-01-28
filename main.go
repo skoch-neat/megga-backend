@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"os"
 
+	"megga-backend/handlers"
 	"megga-backend/services/database"
 	"megga-backend/services/env"
-	"megga-backend/services/router"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -15,15 +17,15 @@ func main() {
 	env.LoadEnv()
 	env.ValidateEnv()
 
-	// Initialize the database and gracefully close it on exit
-	db.InitDB()
-	defer db.DB.Close()
+	// Initialize the database connection
+	database.InitDB()
+	defer database.CloseDB()
 
-	// Initialize the router
-	router, err := router.InitRouter(db.DB)
-	if err != nil {
-		log.Fatalf("Failed to initialize router: %v", err)
-	}
+	// Set up the router
+	router := mux.NewRouter()
+	handlers.RegisterUserRoutes(router, database.DB)
+
+	http.Handle("/", router)
 
 	// Start the server
 	port := os.Getenv("PORT")

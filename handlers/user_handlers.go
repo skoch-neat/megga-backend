@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"log"
 	"megga-backend/models"
+	"megga-backend/services/database"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/gorilla/mux"
 )
 
 // GetUsers handles the retrieval of user data
-func GetUsers(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) {
+func GetUsers(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var users []models.User
 
 	// Query the database
@@ -25,8 +26,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) {
 	// Populate users slice
 	for rows.Next() {
 		var user models.User
-		err := rows.Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName)
-		if err != nil {
+		if err := rows.Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName); err != nil {
 			http.Error(w, "Error scanning user data: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -38,13 +38,13 @@ func GetUsers(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) {
 	json.NewEncoder(w).Encode(users)
 }
 
-func CreateUser(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) {
+// CreateUser handles user signup requests
+func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var user models.User
 
 	// Decode the JSON request body
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -55,18 +55,41 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) {
 	}
 
 	// Insert the new user into the database
-	_, err = db.Exec(context.Background(), `
+	query := `
 		INSERT INTO users (email, first_name, last_name)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (email) DO NOTHING
-	`, user.Email, user.FirstName, user.LastName)
-
+		RETURNING user_id, email
+	`
+	err := db.QueryRow(context.Background(), query, user.Email, user.FirstName, user.LastName).
+		Scan(&user.UserID, &user.Email)
 	if err != nil {
-		log.Printf("Error inserting user: %v\n", err)
-		http.Error(w, "Database insert error: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Error inserting user: %v", err)
+		http.Error(w, "Database insert error", http.StatusInternalServerError)
+		return
+	}
+
+	if user.UserID == 0 {
+		http.Error(w, "Email already exists", http.StatusConflict)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "User created successfully",
+		"user":    user,
+	})
+}
+
+// RegisterUserRoutes registers user-related routes
+func RegisterUserRoutes(router *mux.Router, db database.DBQuerier) {
+	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			CreateUser(w, r, db)
+		} else if r.Method == "GET" {
+			GetUsers(w, r, db)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}).Methods("POST", "GET")
 }

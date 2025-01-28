@@ -7,10 +7,7 @@ import (
 )
 
 // MigrateDB runs database schema migrations.
-func MigrateDB() {
-	// Use the global database connection pool from services
-	db := db.DB
-
+func MigrateDB(db database.DBQuerier) {
 	migrations := map[string]string{
 		"Creating User table": `CREATE TABLE IF NOT EXISTS users (
 			user_id SERIAL PRIMARY KEY,

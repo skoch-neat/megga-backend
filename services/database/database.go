@@ -1,20 +1,31 @@
-package db
+package database
 
 import (
 	"context"
 	"log"
 	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 var DB *pgxpool.Pool
 
+// InitDB initializes the database connection
 func InitDB() {
-    dsn := os.Getenv("DATABASE_URI")
-    var err error
-    DB, err = pgxpool.New(context.Background(), dsn)
-    if err != nil {
-        log.Fatalf("Unable to connect to the database: %v", err)
-    }
+	dsn := os.Getenv("DATABASE_URI")
+	dbPool, err := pgxpool.Connect(context.Background(), dsn)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	DB = dbPool
+	log.Println("Database connection established")
+}
+
+// CloseDB closes the database connection
+func CloseDB() {
+	if DB != nil {
+		DB.Close()
+		log.Println("Database connection closed")
+	}
 }

@@ -24,21 +24,16 @@ func main() {
 	}
 
 	// Initialize the database connection
-	db.InitDB()
-	defer func() {
-		// Close the database connection
-		if db.DB != nil {
-			db.DB.Close()
-		}
-	}()
+	database.InitDB()
+	defer database.CloseDB()
 
 	if *migrate {
 		log.Println("Running migrations...")
-		devutils.MigrateDB()
+		devutils.MigrateDB(database.DB)
 	}
 
 	if *seed {
 		log.Println("Seeding the database...")
-		devutils.SeedDB()
+		devutils.SeedDB(database.DB)
 	}
 }
