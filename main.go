@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	"megga-backend/handlers"
 	"megga-backend/middleware"
+	"megga-backend/routes"
 	"megga-backend/services/database"
 	"megga-backend/services/env"
 
@@ -46,8 +46,7 @@ func main() {
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
 	// Register routes
-	handlers.RegisterUserRoutes(router, database.DB)
-	handlers.RegisterThresholdRoutes(router, database.DB)
+	routes.RegisterRoutes(router, database.DB)
 
 	// Start the server
 	port := os.Getenv("PORT")
