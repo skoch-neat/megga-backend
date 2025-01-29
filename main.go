@@ -45,8 +45,9 @@ func main() {
 	// Apply Cognito middleware globally to secure routes
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
-	// Register user-related routes
+	// Register routes
 	handlers.RegisterUserRoutes(router, database.DB)
+	handlers.RegisterThresholdRoutes(router, database.DB)
 
 	// Start the server
 	port := os.Getenv("PORT")

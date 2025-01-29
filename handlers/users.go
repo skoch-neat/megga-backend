@@ -3,12 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"megga-backend/models"
 	"megga-backend/services/database"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v4"
 )
 
 // GetUsers handles the retrieval of user data
@@ -58,35 +58,30 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var existingID int
 	query := "SELECT user_id FROM users WHERE email = $1"
 	err := db.QueryRow(context.Background(), query, user.Email).Scan(&existingID)
-	if err == nil {
-		// If user already exists, return success response instead of inserting
-		log.Printf("User %s already exists, returning existing user.", user.Email)
-		user.UserID = existingID
-		w.WriteHeader(http.StatusOK)
+	// Insert the new user into the database if no record is found
+	if err == pgx.ErrNoRows {
+		query = `INSERT INTO users (email, first_name, last_name) VALUES ($1, $2, $3) RETURNING user_id, email`
+		if err := db.QueryRow(context.Background(), query, user.Email, user.FirstName, user.LastName).Scan(&user.UserID, &user.Email); err != nil {
+			http.Error(w, "Database insert error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "User already exists",
+			"message": "User created successfully",
 			"user":    user,
 		})
 		return
-	}
-
-	// Insert the new user into the database
-	query = `
-		INSERT INTO users (email, first_name, last_name)
-		VALUES ($1, $2, $3)
-		RETURNING user_id, email
-	`
-	err = db.QueryRow(context.Background(), query, user.Email, user.FirstName, user.LastName).
-		Scan(&user.UserID, &user.Email)
-	if err != nil {
-		log.Printf("Error inserting user: %v", err)
-		http.Error(w, "Database insert error", http.StatusInternalServerError)
+	} else if err != nil { // Handle other potential errors
+		http.Error(w, "Database query error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	// If no error, the user already exists
+	user.UserID = existingID
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "User created successfully",
+		"message": "User already exists",
 		"user":    user,
 	})
 }
@@ -94,11 +89,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 // RegisterUserRoutes registers user-related routes
 func RegisterUserRoutes(router *mux.Router, db database.DBQuerier) {
 	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
+		switch r.Method {
+		case "POST":
 			CreateUser(w, r, db)
-		} else if r.Method == "GET" {
+		case "GET":
 			GetUsers(w, r, db)
-		} else {
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}).Methods("POST", "GET")
