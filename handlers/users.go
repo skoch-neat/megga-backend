@@ -54,23 +54,33 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		return
 	}
 
+	// Check if the user already exists
+	var existingID int
+	query := "SELECT user_id FROM users WHERE email = $1"
+	err := db.QueryRow(context.Background(), query, user.Email).Scan(&existingID)
+	if err == nil {
+		// If user already exists, return success response instead of inserting
+		log.Printf("User %s already exists, returning existing user.", user.Email)
+		user.UserID = existingID
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "User already exists",
+			"user":    user,
+		})
+		return
+	}
+
 	// Insert the new user into the database
-	query := `
+	query = `
 		INSERT INTO users (email, first_name, last_name)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (email) DO NOTHING
 		RETURNING user_id, email
 	`
-	err := db.QueryRow(context.Background(), query, user.Email, user.FirstName, user.LastName).
+	err = db.QueryRow(context.Background(), query, user.Email, user.FirstName, user.LastName).
 		Scan(&user.UserID, &user.Email)
 	if err != nil {
 		log.Printf("Error inserting user: %v", err)
 		http.Error(w, "Database insert error", http.StatusInternalServerError)
-		return
-	}
-
-	if user.UserID == 0 {
-		http.Error(w, "Email already exists", http.StatusConflict)
 		return
 	}
 

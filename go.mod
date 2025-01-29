@@ -4,6 +4,7 @@ go 1.23.4
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.17.0
