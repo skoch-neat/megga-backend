@@ -95,6 +95,37 @@ func TestGetRecipientByID_Success(t *testing.T) {
 	}
 }
 
+// TestUpdateRecipient - Ensures a recipient can be updated
+func TestUpdateRecipient(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("Failed to create mock database: %v", err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec("UPDATE recipients").
+		WithArgs("updated@example.com", "Jane", "Smith", "Updated Role", 42).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	router := setupRecipientRouter(mock)
+
+	body := bytes.NewBufferString(`{
+		"email": "updated@example.com",
+		"first_name": "Jane",
+		"last_name": "Smith",
+		"designation": "Updated Role"
+	}`)
+	req := httptest.NewRequest(http.MethodPut, "/recipients/42", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+}
+
 // TestDeleteRecipient_Success - Ensures a recipient can be deleted
 func TestDeleteRecipient_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
