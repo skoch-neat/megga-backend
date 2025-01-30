@@ -14,6 +14,7 @@ func RegisterRoutes(router *mux.Router, db database.DBQuerier) {
 	handlers.RegisterThresholdRoutes(router, db)
 	handlers.RegisterDataRoutes(router, db)
 	handlers.RegisterNotificationRoutes(router, db)
+	handlers.RegisterRecipientRoutes(router, db)
 
 	// Apply middleware if needed
 	router.Use(middleware.ValidateCognitoToken(middleware.CognitoConfig{
