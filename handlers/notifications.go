@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// CreateNotification - Inserts a new notification
 func CreateNotification(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var notification models.Notification
 
@@ -46,7 +45,6 @@ func CreateNotification(w http.ResponseWriter, r *http.Request, db database.DBQu
 	})
 }
 
-// GetNotifications - Retrieves all notifications
 func GetNotifications(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var notifications []models.Notification
 
@@ -77,7 +75,6 @@ func GetNotifications(w http.ResponseWriter, r *http.Request, db database.DBQuer
 	json.NewEncoder(w).Encode(notifications)
 }
 
-// GetNotificationByID - Retrieves a single notification by ID
 func GetNotificationByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -96,7 +93,6 @@ func GetNotificationByID(w http.ResponseWriter, r *http.Request, db database.DBQ
 		&notification.ThresholdID, &notification.SentAt, &notification.UserMsg, &notification.RecipientMsg,
 	)
 
-	// Explicit Logging of Query Failures
 	if err == pgx.ErrNoRows {
 		http.Error(w, "Notification not found", http.StatusNotFound)
 		return
@@ -109,7 +105,6 @@ func GetNotificationByID(w http.ResponseWriter, r *http.Request, db database.DBQ
 	json.NewEncoder(w).Encode(notification)
 }
 
-// UpdateNotification - Updates an existing notification
 func UpdateNotification(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -139,7 +134,6 @@ func UpdateNotification(w http.ResponseWriter, r *http.Request, db database.DBQu
 	json.NewEncoder(w).Encode(map[string]string{"message": "Notification updated successfully"})
 }
 
-// DeleteNotification - Removes a notification by ID
 func DeleteNotification(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])

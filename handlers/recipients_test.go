@@ -10,14 +10,12 @@ import (
 	"github.com/pashagolub/pgxmock"
 )
 
-// Helper function to set up the router with proper route extraction
 func setupRecipientRouter(mock pgxmock.PgxPoolIface) *mux.Router {
 	router := mux.NewRouter()
 	RegisterRecipientRoutes(router, mock)
 	return router
 }
 
-// TestCreateRecipient - Ensures a recipient can be created
 func TestCreateRecipient(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -48,7 +46,6 @@ func TestCreateRecipient(t *testing.T) {
 	}
 }
 
-// TestGetRecipients - Ensures all recipients can be retrieved
 func TestGetRecipients(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -71,7 +68,6 @@ func TestGetRecipients(t *testing.T) {
 	}
 }
 
-// TestGetRecipientByID_Success - Ensures a recipient can be retrieved by ID
 func TestGetRecipientByID_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -95,7 +91,6 @@ func TestGetRecipientByID_Success(t *testing.T) {
 	}
 }
 
-// TestUpdateRecipient - Ensures a recipient can be updated
 func TestUpdateRecipient(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -126,7 +121,6 @@ func TestUpdateRecipient(t *testing.T) {
 	}
 }
 
-// TestDeleteRecipient_Success - Ensures a recipient can be deleted
 func TestDeleteRecipient_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {

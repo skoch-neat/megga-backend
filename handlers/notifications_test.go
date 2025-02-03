@@ -12,14 +12,12 @@ import (
 	"github.com/pashagolub/pgxmock"
 )
 
-// Helper function to set up the router with proper route extraction
 func setupNotificationRouter(mock pgxmock.PgxPoolIface) *mux.Router {
 	router := mux.NewRouter()
 	RegisterNotificationRoutes(router, mock)
 	return router
 }
 
-// TestCreateNotification - Ensures a notification can be created
 func TestCreateNotification(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -51,7 +49,6 @@ func TestCreateNotification(t *testing.T) {
 	}
 }
 
-// TestGetNotifications - Ensures all notifications can be retrieved
 func TestGetNotifications(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -75,7 +72,6 @@ func TestGetNotifications(t *testing.T) {
 	}
 }
 
-// TestGetNotificationByID_Success - Ensures a notification can be retrieved by ID
 func TestGetNotificationByID_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -100,7 +96,6 @@ func TestGetNotificationByID_Success(t *testing.T) {
 	}
 }
 
-// TestGetNotificationByID_NotFound - Ensures 404 response for non-existent notification
 func TestGetNotificationByID_NotFound(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -127,7 +122,6 @@ func TestGetNotificationByID_NotFound(t *testing.T) {
 	}
 }
 
-// TestUpdateNotification - Ensures a notification can be updated
 func TestUpdateNotification(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -156,7 +150,6 @@ func TestUpdateNotification(t *testing.T) {
 	}
 }
 
-// TestDeleteNotification_Success - Ensures a notification can be deleted
 func TestDeleteNotification_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -180,7 +173,6 @@ func TestDeleteNotification_Success(t *testing.T) {
 	}
 }
 
-// TestDeleteNotification_NotFound - Ensures 404 response for deleting a non-existent notification
 func TestDeleteNotification_NotFound(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -189,7 +181,7 @@ func TestDeleteNotification_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectExec("DELETE FROM notifications").
-		WithArgs(99). // Non-existent ID
+		WithArgs(99).
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	router := setupNotificationRouter(mock)

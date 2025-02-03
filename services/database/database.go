@@ -10,7 +10,6 @@ import (
 
 var DB *pgxpool.Pool
 
-// InitDB initializes the database connection
 func InitDB() {
 	dsn := os.Getenv("DATABASE_URI")
 	dbPool, err := pgxpool.Connect(context.Background(), dsn)
@@ -22,7 +21,6 @@ func InitDB() {
 	log.Println("Database connection established")
 }
 
-// CloseDB closes the database connection
 func CloseDB() {
 	if DB != nil {
 		DB.Close()

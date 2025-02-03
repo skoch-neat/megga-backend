@@ -12,26 +12,21 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// CreateData handles inserting a new Data entry
 func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var data models.Data
 
-	// Decode JSON request
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate required fields
 	if data.Name == "" || data.SeriesID == "" || data.Type == "" || data.Unit == "" || data.LatestValue == 0 || data.UpdateIntervalInDays == 0 {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
-	// For a new data entry, PreviousValue should be initialized to the LatestValue
 	data.PreviousValue = data.LatestValue
 
-	// Insert query
 	query := `
 		INSERT INTO data (name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
@@ -47,7 +42,6 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		return
 	}
 
-	// Response
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Data created successfully",
@@ -81,7 +75,6 @@ func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		dataEntries = append(dataEntries, data)
 	}
 
-	// Return an empty array if no data exists
 	if len(dataEntries) == 0 {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
@@ -96,11 +89,10 @@ func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 func GetDataByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
-if err != nil || id <= 0 {
-	http.Error(w, "Invalid data ID", http.StatusBadRequest)
-	return
-}
-
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid data ID", http.StatusBadRequest)
+		return
+	}
 
 	var data models.Data
 	query := `
@@ -120,7 +112,6 @@ if err != nil || id <= 0 {
 		return
 	}
 
-	// Ensure proper JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// CreateThresholdRecipient inserts a new threshold recipient
 func CreateThresholdRecipient(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var recipient models.ThresholdRecipient
 
@@ -31,8 +30,8 @@ func CreateThresholdRecipient(w http.ResponseWriter, r *http.Request, db databas
 		VALUES ($1, $2, $3)
 		RETURNING threshold_id, recipient_id, is_user
 	`
-	err := db.QueryRow(context.Background(), query, recipient.ThresholdID, recipient.RecipientID, recipient.IsUser).
-		Scan(&recipient.ThresholdID, &recipient.RecipientID, &recipient.IsUser)
+	err := db.QueryRow(context.Background(), query, recipient.ThresholdID, recipient.RecipientID).
+		Scan(&recipient.ThresholdID, &recipient.RecipientID)
 
 	if err != nil {
 		http.Error(w, "Database insert error", http.StatusInternalServerError)
@@ -46,7 +45,6 @@ func CreateThresholdRecipient(w http.ResponseWriter, r *http.Request, db databas
 	})
 }
 
-// GetThresholdRecipients retrieves all threshold recipients
 func GetThresholdRecipients(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var recipients []models.ThresholdRecipient
 
@@ -60,7 +58,7 @@ func GetThresholdRecipients(w http.ResponseWriter, r *http.Request, db database.
 
 	for rows.Next() {
 		var recipient models.ThresholdRecipient
-		if err := rows.Scan(&recipient.ThresholdID, &recipient.RecipientID, &recipient.IsUser); err != nil {
+		if err := rows.Scan(&recipient.ThresholdID, &recipient.RecipientID); err != nil {
 			http.Error(w, "Error scanning recipients", http.StatusInternalServerError)
 			return
 		}
@@ -71,7 +69,6 @@ func GetThresholdRecipients(w http.ResponseWriter, r *http.Request, db database.
 	json.NewEncoder(w).Encode(recipients)
 }
 
-// GetThresholdRecipientByID retrieves a single recipient by ThresholdID and RecipientID
 func GetThresholdRecipientByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	thresholdID, err1 := strconv.Atoi(vars["threshold_id"])
@@ -87,7 +84,7 @@ func GetThresholdRecipientByID(w http.ResponseWriter, r *http.Request, db databa
 		SELECT threshold_id, recipient_id, is_user
 		FROM threshold_recipients WHERE threshold_id = $1 AND recipient_id = $2
 	`
-	err := db.QueryRow(context.Background(), query, thresholdID, recipientID).Scan(&recipient.ThresholdID, &recipient.RecipientID, &recipient.IsUser)
+	err := db.QueryRow(context.Background(), query, thresholdID, recipientID).Scan(&recipient.ThresholdID, &recipient.RecipientID)
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "Threshold recipient not found", http.StatusNotFound)
@@ -101,7 +98,6 @@ func GetThresholdRecipientByID(w http.ResponseWriter, r *http.Request, db databa
 	json.NewEncoder(w).Encode(recipient)
 }
 
-// UpdateThresholdRecipient updates a recipient's `is_user` status
 func UpdateThresholdRecipient(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	thresholdID, err1 := strconv.Atoi(vars["threshold_id"])
@@ -123,7 +119,7 @@ func UpdateThresholdRecipient(w http.ResponseWriter, r *http.Request, db databas
 		SET is_user = $1
 		WHERE threshold_id = $2 AND recipient_id = $3
 	`
-	_, err := db.Exec(context.Background(), query, recipient.IsUser, thresholdID, recipientID)
+	_, err := db.Exec(context.Background(), query, thresholdID, recipientID)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
@@ -133,7 +129,6 @@ func UpdateThresholdRecipient(w http.ResponseWriter, r *http.Request, db databas
 	json.NewEncoder(w).Encode(map[string]string{"message": "Threshold recipient updated successfully"})
 }
 
-// DeleteThresholdRecipient removes a recipient from a threshold
 func DeleteThresholdRecipient(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	thresholdID, err1 := strconv.Atoi(vars["threshold_id"])
@@ -161,7 +156,6 @@ func DeleteThresholdRecipient(w http.ResponseWriter, r *http.Request, db databas
 	json.NewEncoder(w).Encode(map[string]string{"message": "Threshold recipient deleted successfully"})
 }
 
-// RegisterThresholdRecipientRoutes registers all routes
 func RegisterThresholdRecipientRoutes(router *mux.Router, db database.DBQuerier) {
 	router.HandleFunc("/threshold_recipients", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {

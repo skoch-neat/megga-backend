@@ -19,7 +19,6 @@ func TestCreateData(t *testing.T) {
 	}
 	defer mock.Close()
 
-	// Verify the correct number of arguments
 	mock.ExpectQuery("INSERT INTO data").
 		WithArgs("Test Item", "SERIES_123", "good", "kg", 100.0, 100.0, 30).
 		WillReturnRows(pgxmock.NewRows([]string{"data_id"}).AddRow(42))
@@ -42,7 +41,6 @@ func TestCreateData(t *testing.T) {
 		t.Errorf("Expected status %d, got %d", http.StatusCreated, w.Code)
 	}
 
-	// Ensure all expectations were met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet mock expectations: %v", err)
 	}
@@ -55,7 +53,6 @@ func TestGetData(t *testing.T) {
 	}
 	defer mock.Close()
 
-	// Mocking `last_updated` as `time.Time`
 	lastUpdated := time.Date(2025, 1, 29, 0, 0, 0, 0, time.UTC)
 
 	mock.ExpectQuery("SELECT data_id, name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days FROM data").
@@ -89,7 +86,6 @@ func TestGetDataByID_Success(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/data/42", nil)
 	w := httptest.NewRecorder()
 
-	// Inject path variable into request context
 	req = mux.SetURLVars(req, map[string]string{"id": "42"})
 
 	GetDataByID(w, req, mock)
@@ -113,7 +109,6 @@ func TestGetDataByID_NotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/data/99", nil)
 	w := httptest.NewRecorder()
 
-	// Inject path variable into request context
 	req = mux.SetURLVars(req, map[string]string{"id": "99"})
 
 	GetDataByID(w, req, mock)
@@ -145,7 +140,6 @@ func TestUpdateData(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/data/42", body)
 	w := httptest.NewRecorder()
 
-	// Inject path variable into request context
 	req = mux.SetURLVars(req, map[string]string{"id": "42"})
 
 	UpdateData(w, req, mock)
@@ -169,7 +163,6 @@ func TestDeleteData(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/data/42", nil)
 	w := httptest.NewRecorder()
 
-	// Inject path variable into request context
 	req = mux.SetURLVars(req, map[string]string{"id": "42"})
 
 	DeleteData(w, req, mock)

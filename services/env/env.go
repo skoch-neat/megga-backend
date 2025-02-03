@@ -7,7 +7,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// LoadEnv loads environment variables from a .env file
 func LoadEnv() {
 	err := godotenv.Load()
 	if err != nil {
@@ -15,7 +14,6 @@ func LoadEnv() {
 	}
 }
 
-// ValidateEnv ensures all required environment variables are set.
 func ValidateEnv() {
 	requiredVars := []string{
 		"DATABASE_URI",

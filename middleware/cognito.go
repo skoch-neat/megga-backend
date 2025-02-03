@@ -17,18 +17,15 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// Define a unique type for context keys
 type contextKey string
 
 const claimsContextKey contextKey = "claims"
 
-// CognitoConfig holds Cognito user pool details
 type CognitoConfig struct {
 	UserPoolID string
 	Region     string
 }
 
-// ValidateCognitoToken is middleware to validate JWT tokens issued by AWS Cognito
 func ValidateCognitoToken(config CognitoConfig) func(http.Handler) http.Handler {
 	jwksURL := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s/.well-known/jwks.json", config.Region, config.UserPoolID)
 
@@ -42,7 +39,6 @@ func ValidateCognitoToken(config CognitoConfig) func(http.Handler) http.Handler 
 
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-			// ✅ Check if it's a test JWT using HS256
 			if isMockJWT(tokenStr) {
 				token, err := parseMockToken(tokenStr)
 				if err != nil {
@@ -55,7 +51,6 @@ func ValidateCognitoToken(config CognitoConfig) func(http.Handler) http.Handler 
 				return
 			}
 
-			// 🔹 Otherwise, process as a real Cognito JWT
 			token, err := parseAndValidateToken(tokenStr, jwksURL)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Invalid token: %v", err), http.StatusUnauthorized)
@@ -68,12 +63,10 @@ func ValidateCognitoToken(config CognitoConfig) func(http.Handler) http.Handler 
 	}
 }
 
-// ✅ Check if the JWT is a mock test token
 func isMockJWT(tokenStr string) bool {
 	return strings.Contains(tokenStr, os.Getenv("MOCK_JWT_TOKEN"))
 }
 
-// ✅ Parse and Validate Mock JWT Token
 func parseMockToken(tokenStr string) (*jwt.Token, error) {
 	parser := jwt.NewParser(jwt.WithValidMethods([]string{"HS256"}))
 	return parser.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
@@ -81,21 +74,17 @@ func parseMockToken(tokenStr string) (*jwt.Token, error) {
 	})
 }
 
-// parseAndValidateToken parses and validates a JWT token
 func parseAndValidateToken(tokenStr, jwksURL string) (*jwt.Token, error) {
 	keyFunc := func(token *jwt.Token) (interface{}, error) {
-		// Validate token signing method
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
 
-		// Fetch JWKS
 		jwks, err := fetchJWKS(jwksURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
 		}
 
-		// Match key
 		kid, ok := token.Header["kid"].(string)
 		if !ok {
 			return nil, errors.New("missing kid in token header")
@@ -111,7 +100,6 @@ func parseAndValidateToken(tokenStr, jwksURL string) (*jwt.Token, error) {
 	return jwt.NewParser().Parse(tokenStr, keyFunc)
 }
 
-// fetchJWKS fetches and parses the JWKS and converts it to rsa.PublicKey
 func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 	resp, err := http.Get(jwksURL)
 	if err != nil {
@@ -130,7 +118,6 @@ func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 		return nil, err
 	}
 
-	// Map keys by kid
 	keyMap := make(map[string]*rsa.PublicKey)
 	for _, key := range jwks.Keys {
 		nBytes, err := decodeBase64(key.N)
@@ -142,7 +129,6 @@ func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 			return nil, fmt.Errorf("failed to decode exponent: %w", err)
 		}
 
-		// Construct RSA Public Key
 		pubKey := &rsa.PublicKey{
 			N: new(big.Int).SetBytes(nBytes),
 			E: eBytes,
@@ -154,12 +140,10 @@ func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 	return keyMap, nil
 }
 
-// decodeBase64 decodes a Base64 URL-encoded string to bytes
 func decodeBase64(input string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(input)
 }
 
-// decodeBase64ToInt decodes a Base64 URL-encoded string to an integer
 func decodeBase64ToInt(input string) (int, error) {
 	decoded, err := decodeBase64(input)
 	if err != nil {

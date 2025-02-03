@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgconn"
 )
 
-// DBQuerier defines methods for querying the database
 type DBQuerier interface {
 	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)

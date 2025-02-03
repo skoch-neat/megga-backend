@@ -11,7 +11,6 @@ import (
 	"github.com/pashagolub/pgxmock"
 )
 
-// TestCreateThreshold ensures a threshold can be created
 func TestCreateThreshold(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -20,7 +19,7 @@ func TestCreateThreshold(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectQuery("INSERT INTO thresholds").
-		WithArgs(1, 100.5). // Assuming data_id = 1, threshold_value = 100.5
+		WithArgs(1, 100.5).
 		WillReturnRows(pgxmock.NewRows([]string{"threshold_id"}).AddRow(42))
 
 	body := bytes.NewBufferString(`{"data_id":1, "threshold_value":100.5}`)
@@ -35,7 +34,6 @@ func TestCreateThreshold(t *testing.T) {
 	}
 }
 
-// TestGetThresholds ensures all thresholds can be retrieved
 func TestGetThresholds(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -64,17 +62,15 @@ func TestUpdateThreshold(t *testing.T) {
 	}
 	defer mock.Close()
 
-	// ✅ Use ExpectQuery instead of ExpectExec, since handler uses QueryRow()
 	mock.ExpectQuery("UPDATE thresholds").
 		WithArgs(200.0, 42).
 		WillReturnRows(pgxmock.NewRows([]string{"threshold_id", "data_id", "threshold_value"}).
-			AddRow(42, 1, 200.0)) // ✅ Simulating successful update with returning values
+			AddRow(42, 1, 200.0))
 
 	body := bytes.NewBufferString(`{"threshold_value":200.0}`)
 	req := httptest.NewRequest(http.MethodPut, "/thresholds/42", body)
 	req.Header.Set("Content-Type", "application/json")
 
-	// ✅ Manually inject URL parameters into the request
 	req = mux.SetURLVars(req, map[string]string{"id": "42"})
 
 	w := httptest.NewRecorder()
@@ -84,10 +80,6 @@ func TestUpdateThreshold(t *testing.T) {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
-	// ✅ Print response body for debugging
-	t.Log("Response Body:", w.Body.String())
-
-	// ✅ Ensure mock expectations were met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet mock expectations: %v", err)
 	}
@@ -102,10 +94,10 @@ func TestDeleteThreshold_Success(t *testing.T) {
 
 	mock.ExpectExec("DELETE FROM thresholds").
 		WithArgs(42).
-		WillReturnResult(pgxmock.NewResult("DELETE", 1)) // ✅ Simulate 1 row deleted
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
 
 	req := httptest.NewRequest(http.MethodDelete, "/thresholds/42", nil)
-	req = mux.SetURLVars(req, map[string]string{"id": "42"}) // ✅ Explicitly set vars for mux
+	req = mux.SetURLVars(req, map[string]string{"id": "42"})
 	w := httptest.NewRecorder()
 
 	DeleteThreshold(w, req, mock)
@@ -124,10 +116,10 @@ func TestDeleteThreshold_NotFound(t *testing.T) {
 
 	mock.ExpectExec("DELETE FROM thresholds").
 		WithArgs(99).
-		WillReturnResult(pgxmock.NewResult("DELETE", 0)) // ✅ Simulate no rows deleted
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	req := httptest.NewRequest(http.MethodDelete, "/thresholds/99", nil)
-	req = mux.SetURLVars(req, map[string]string{"id": "99"}) // ✅ Explicitly set vars for mux
+	req = mux.SetURLVars(req, map[string]string{"id": "99"})
 	w := httptest.NewRecorder()
 
 	DeleteThreshold(w, req, mock)
@@ -146,10 +138,10 @@ func TestDeleteThreshold_DBError(t *testing.T) {
 
 	mock.ExpectExec("DELETE FROM thresholds").
 		WithArgs(42).
-		WillReturnError(errors.New("database error")) // ✅ Simulate a DB failure
+		WillReturnError(errors.New("database error"))
 
 	req := httptest.NewRequest(http.MethodDelete, "/thresholds/42", nil)
-	req = mux.SetURLVars(req, map[string]string{"id": "42"}) // ✅ Explicitly set vars for mux
+	req = mux.SetURLVars(req, map[string]string{"id": "42"})
 	w := httptest.NewRecorder()
 
 	DeleteThreshold(w, req, mock)

@@ -9,6 +9,7 @@ require (
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.17.0
 	github.com/joho/godotenv v1.5.1
+	github.com/lib/pq v1.10.2
 	github.com/pashagolub/pgxmock v1.8.0
 	github.com/rs/cors v1.11.1
 )

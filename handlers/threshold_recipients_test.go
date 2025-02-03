@@ -11,14 +11,12 @@ import (
 	"github.com/pashagolub/pgxmock"
 )
 
-// Helper function to set up the router for testing
 func setupThresholdRecipientRouter(mock pgxmock.PgxPoolIface) *mux.Router {
 	router := mux.NewRouter()
 	RegisterThresholdRecipientRoutes(router, mock)
 	return router
 }
 
-// TestCreateThresholdRecipient ensures a threshold recipient can be created
 func TestCreateThresholdRecipient(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -48,7 +46,6 @@ func TestCreateThresholdRecipient(t *testing.T) {
 	}
 }
 
-// TestGetThresholdRecipients ensures all threshold recipients can be retrieved
 func TestGetThresholdRecipients(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -72,7 +69,6 @@ func TestGetThresholdRecipients(t *testing.T) {
 	}
 }
 
-// TestGetThresholdRecipientByID_Success ensures a recipient can be retrieved by ID
 func TestGetThresholdRecipientByID_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -97,7 +93,6 @@ func TestGetThresholdRecipientByID_Success(t *testing.T) {
 	}
 }
 
-// TestGetThresholdRecipientByID_NotFound ensures 404 response for non-existent recipient
 func TestGetThresholdRecipientByID_NotFound(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -106,7 +101,7 @@ func TestGetThresholdRecipientByID_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectQuery("SELECT threshold_id, recipient_id, is_user FROM threshold_recipients WHERE threshold_id = \\$1 AND recipient_id = \\$2").
-    WithArgs(99, 100). // Non-existent
+    WithArgs(99, 100).
     WillReturnError(pgx.ErrNoRows)
 
 	router := setupThresholdRecipientRouter(mock)
@@ -121,7 +116,6 @@ func TestGetThresholdRecipientByID_NotFound(t *testing.T) {
 	}
 }
 
-// TestUpdateThresholdRecipient ensures a recipient's `is_user` status can be updated
 func TestUpdateThresholdRecipient(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -131,7 +125,7 @@ func TestUpdateThresholdRecipient(t *testing.T) {
 
 	mock.ExpectExec("UPDATE threshold_recipients").
 		WithArgs(false, 1, 2).
-		WillReturnResult(pgxmock.NewResult("UPDATE", 1)) // Simulating update success
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	router := setupThresholdRecipientRouter(mock)
 
@@ -149,7 +143,6 @@ func TestUpdateThresholdRecipient(t *testing.T) {
 	}
 }
 
-// TestDeleteThresholdRecipient_Success ensures a recipient can be deleted
 func TestDeleteThresholdRecipient_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -159,7 +152,7 @@ func TestDeleteThresholdRecipient_Success(t *testing.T) {
 
 	mock.ExpectExec("DELETE FROM threshold_recipients").
 		WithArgs(1, 2).
-		WillReturnResult(pgxmock.NewResult("DELETE", 1)) // Simulating successful deletion
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
 
 	router := setupThresholdRecipientRouter(mock)
 
@@ -173,7 +166,6 @@ func TestDeleteThresholdRecipient_Success(t *testing.T) {
 	}
 }
 
-// TestDeleteThresholdRecipient_NotFound ensures 404 response for deleting a non-existent recipient
 func TestDeleteThresholdRecipient_NotFound(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -182,8 +174,8 @@ func TestDeleteThresholdRecipient_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectExec("DELETE FROM threshold_recipients").
-		WithArgs(99, 100). // Non-existent
-		WillReturnResult(pgxmock.NewResult("DELETE", 0)) // Simulating no rows affected
+		WithArgs(99, 100).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	router := setupThresholdRecipientRouter(mock)
 

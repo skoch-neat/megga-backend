@@ -10,7 +10,6 @@ import (
 	"megga-backend/handlers"
 )
 
-// Helper function to setup a router with all registered routes
 func setupRouter(mock pgxmock.PgxPoolIface) *mux.Router {
 	router := mux.NewRouter()
 	handlers.RegisterDataRoutes(router, mock)
@@ -18,7 +17,6 @@ func setupRouter(mock pgxmock.PgxPoolIface) *mux.Router {
 	return router
 }
 
-// TestRegisterDataRoutes - Ensures /data routes are correctly mapped
 func TestRegisterDataRoutes(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -28,7 +26,6 @@ func TestRegisterDataRoutes(t *testing.T) {
 
 	router := setupRouter(mock)
 
-	// Check valid routes
 	validRoutes := []struct {
 		method string
 		url    string
@@ -51,7 +48,6 @@ func TestRegisterDataRoutes(t *testing.T) {
 		})
 	}
 
-	// Check invalid method
 	req := httptest.NewRequest("PATCH", "/data", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -60,7 +56,6 @@ func TestRegisterDataRoutes(t *testing.T) {
 	}
 }
 
-// TestRegisterThresholdRoutes - Ensures /thresholds routes are correctly mapped
 func TestRegisterThresholdRoutes(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -91,7 +86,6 @@ func TestRegisterThresholdRoutes(t *testing.T) {
 		})
 	}
 
-	// Check invalid method
 	req := httptest.NewRequest("PATCH", "/thresholds", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

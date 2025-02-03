@@ -15,7 +15,6 @@ type MockDBWrapper struct {
 	Mock pgxmock.PgxPoolIface
 }
 
-// NewMockDB creates a new mock database connection
 func NewMockDB() (*sql.DB, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -24,7 +23,6 @@ func NewMockDB() (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
-// MockRow is a helper for creating rows in tests
 func MockRow(columns []string, values ...driver.Value) *sqlmock.Rows {
 	return sqlmock.NewRows(columns).AddRow(values...)
 }

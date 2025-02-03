@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// ✅ CreateRecipient - Inserts a new recipient
 func CreateRecipient(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var recipient models.Recipient
 
@@ -47,7 +46,6 @@ func CreateRecipient(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	})
 }
 
-// ✅ GetRecipients - Retrieves all recipients
 func GetRecipients(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var recipients []models.Recipient
 
@@ -77,7 +75,6 @@ func GetRecipients(w http.ResponseWriter, r *http.Request, db database.DBQuerier
 	json.NewEncoder(w).Encode(recipients)
 }
 
-// ✅ GetRecipientByID - Retrieves a single recipient by ID
 func GetRecipientByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
@@ -117,7 +114,6 @@ func GetRecipientByID(w http.ResponseWriter, r *http.Request, db database.DBQuer
 	json.NewEncoder(w).Encode(recipient)
 }
 
-// ✅ UpdateRecipient - Updates an existing recipient
 func UpdateRecipient(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -147,7 +143,6 @@ func UpdateRecipient(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	json.NewEncoder(w).Encode(map[string]string{"message": "Recipient updated successfully"})
 }
 
-// ✅ DeleteRecipient - Removes a recipient by ID
 func DeleteRecipient(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -173,7 +168,6 @@ func DeleteRecipient(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	json.NewEncoder(w).Encode(map[string]string{"message": "Recipient deleted successfully"})
 }
 
-// ✅ RegisterRecipientRoutes - Ensures proper route registration
 func RegisterRecipientRoutes(router *mux.Router, db database.DBQuerier) {
 	router.HandleFunc("/recipients", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
@@ -185,7 +179,6 @@ func RegisterRecipientRoutes(router *mux.Router, db database.DBQuerier) {
 		}
 	}).Methods("POST", "GET")
 
-	// 🔹 Ensure ID extraction with `{id:[0-9]+}`
 	router.HandleFunc("/recipients/{id:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			GetRecipientByID(w, r, db)

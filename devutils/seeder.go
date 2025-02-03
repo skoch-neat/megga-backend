@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// SeedDB seeds the database with test data
 func SeedDB(db database.DBQuerier) {
 	seeds := map[string]string{
 		"Inserting Users": `INSERT INTO users (email, first_name, last_name) VALUES 
@@ -25,9 +24,9 @@ func SeedDB(db database.DBQuerier) {
 			('Inflation', 'LEU0252881600', 'Indicator', '%', 2.5, 2.8, NOW(), 30)
 			ON CONFLICT DO NOTHING;`,
 
-		"Inserting Thresholds": `INSERT INTO thresholds (data_id, threshold_value, created_at) VALUES 
-			(1, 5.0, NOW()),
-			(2, 10.0, NOW())
+		"Inserting Thresholds": `INSERT INTO thresholds (user_pool_id, data_id, threshold_value, created_at, notify_user) VALUES 
+			(1, 1, 5.0, NOW(), true),
+			(2, 2, 10.0, NOW(), false)
 			ON CONFLICT DO NOTHING;`,
 
 		"Inserting Notifications": `INSERT INTO notifications (user_id, recipient_id, threshold_id, sent_at, user_msg, recipient_msg) VALUES 
@@ -35,11 +34,11 @@ func SeedDB(db database.DBQuerier) {
 			(2, 2, 2, NOW(), 'Notification to User2', 'Notification to Recipient2')
 			ON CONFLICT DO NOTHING;`,
 
-		"Inserting Threshold Recipients": `INSERT INTO threshold_recipients (threshold_id, recipient_id, is_user) VALUES 
-			(1, 1, true),
-			(1, 1, false),
-			(2, 2, true),
-			(2, 2, false)
+		"Inserting Threshold Recipients": `INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES 
+			(1, 1),
+			(1, 2),
+			(2, 2),
+			(2, 1)
 			ON CONFLICT DO NOTHING;`,
 	}
 

@@ -11,11 +11,9 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// GetUsers handles the retrieval of user data
 func GetUsers(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var users []models.User
 
-	// Query the database
 	rows, err := db.Query(context.Background(), "SELECT user_id, email, first_name, last_name FROM users")
 	if err != nil {
 		http.Error(w, "Database query error: "+err.Error(), http.StatusInternalServerError)
@@ -23,7 +21,6 @@ func GetUsers(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	}
 	defer rows.Close()
 
-	// Populate users slice
 	for rows.Next() {
 		var user models.User
 		if err := rows.Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName); err != nil {
@@ -32,33 +29,53 @@ func GetUsers(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		}
 		users = append(users, user)
 	}
+	
 
-	// Respond with JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
 }
 
-// CreateUser handles user signup requests
+func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
+	vars := mux.Vars(r)
+	email := vars["email"]
+
+	if email == "" {
+		http.Error(w, "Email parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	var user models.User
+	query := "SELECT user_id, email, first_name, last_name FROM users WHERE email = $1"
+	err := db.QueryRow(context.Background(), query, email).Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName)
+
+	if err == pgx.ErrNoRows {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
 func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	var user models.User
 
-	// Decode the JSON request body
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Validate the user data
 	if user.Email == "" || user.FirstName == "" || user.LastName == "" {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
-	// Check if the user already exists
 	var existingID int
 	query := "SELECT user_id FROM users WHERE email = $1"
 	err := db.QueryRow(context.Background(), query, user.Email).Scan(&existingID)
-	// Insert the new user into the database if no record is found
 	if err == pgx.ErrNoRows {
 		query = `INSERT INTO users (email, first_name, last_name) VALUES ($1, $2, $3) RETURNING user_id, email`
 		if err := db.QueryRow(context.Background(), query, user.Email, user.FirstName, user.LastName).Scan(&user.UserID, &user.Email); err != nil {
@@ -72,12 +89,11 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 			"user":    user,
 		})
 		return
-	} else if err != nil { // Handle other potential errors
+	} else if err != nil {
 		http.Error(w, "Database query error", http.StatusInternalServerError)
 		return
 	}
 
-	// If no error, the user already exists
 	user.UserID = existingID
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -86,7 +102,6 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	})
 }
 
-// RegisterUserRoutes registers user-related routes
 func RegisterUserRoutes(router *mux.Router, db database.DBQuerier) {
 	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -98,4 +113,12 @@ func RegisterUserRoutes(router *mux.Router, db database.DBQuerier) {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}).Methods("POST", "GET")
+
+	router.HandleFunc("/users/email/{email}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			GetUserByEmail(w, r, db)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}).Methods("GET")
 }
