@@ -7,12 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
-	"os"
 	"strings"
-
-	"megga-backend/testutils"
 
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -33,26 +31,16 @@ func ValidateCognitoToken(config CognitoConfig) func(http.Handler) http.Handler 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
+				log.Println("❌ Missing Authorization header")
 				http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 				return
 			}
 
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-			if isMockJWT(tokenStr) {
-				token, err := parseMockToken(tokenStr)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("Invalid token: %v", err), http.StatusUnauthorized)
-					return
-				}
-
-				r = r.WithContext(context.WithValue(r.Context(), claimsContextKey, token.Claims))
-				next.ServeHTTP(w, r)
-				return
-			}
-
 			token, err := parseAndValidateToken(tokenStr, jwksURL)
 			if err != nil {
+				log.Println("❌ Token validation failed:", err)
 				http.Error(w, fmt.Sprintf("Invalid token: %v", err), http.StatusUnauthorized)
 				return
 			}
@@ -61,17 +49,6 @@ func ValidateCognitoToken(config CognitoConfig) func(http.Handler) http.Handler 
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func isMockJWT(tokenStr string) bool {
-	return strings.Contains(tokenStr, os.Getenv("MOCK_JWT_TOKEN"))
-}
-
-func parseMockToken(tokenStr string) (*jwt.Token, error) {
-	parser := jwt.NewParser(jwt.WithValidMethods([]string{"HS256"}))
-	return parser.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		return []byte(testutils.TestSecretKey), nil
-	})
 }
 
 func parseAndValidateToken(tokenStr, jwksURL string) (*jwt.Token, error) {

@@ -11,59 +11,86 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v4"
+
 	"github.com/lib/pq"
 )
 
 func CreateThreshold(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	var request struct {
-		UserPoolID     int     `json:"user_pool_id"`
-		DataID         int     `json:"data_id"`
-		ThresholdValue float64 `json:"threshold_value"`
-		NotifyUsers    bool    `json:"notify_user"`
-		Recipients     []int   `json:"recipients"`
-	}
+	var request models.Threshold
 
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("🔍 Raw Request Body: %s", string(body))
+
+	if err := json.Unmarshal(body, &request); err != nil {
+		log.Printf("❌ JSON Unmarshal Error: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if request.UserPoolID == 0 || request.DataID == 0 || request.ThresholdValue == 0 || len(request.Recipients) == 0 {
+	log.Printf("✅ Decoded Request: %+v", request)
+
+	if request.UserID == 0 || request.DataID == 0 || request.ThresholdValue == 0 || len(request.Recipients) == 0 {
+		log.Printf("❌ Missing Required Fields: UserID=%d, DataID=%d, ThresholdValue=%f, Recipients=%v",
+			request.UserID, request.DataID, request.ThresholdValue, request.Recipients)
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
-	var existingID int
-	checkQuery := "SELECT threshold_id FROM thresholds WHERE user_pool_id = $1 AND data_id = $2"
-	err := db.QueryRow(context.Background(), checkQuery, request.UserPoolID, request.DataID).Scan(&existingID)
+	log.Printf("✅ Preparing to Insert: UserID=%d, DataID=%d, ThresholdValue=%.2f, NotifyUser=%t, Recipients=%v",
+		request.UserID, request.DataID, request.ThresholdValue, request.NotifyUser, request.Recipients)
 
-	if err == nil {
-		http.Error(w, "Threshold already exists for this user and data point", http.StatusConflict)
+	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		log.Printf("❌ Error Starting Transaction: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(context.Background())
 
 	var thresholdID int
-	insertThresholdQuery := `
-		INSERT INTO thresholds (user_pool_id, data_id, threshold_value, created_at, notify_user)
-		VALUES ($1, $2, $3, NOW(), $4)
-		RETURNING threshold_id
-	`
-	err = db.QueryRow(context.Background(), insertThresholdQuery, request.UserPoolID, request.DataID, request.ThresholdValue, request.NotifyUsers).Scan(&thresholdID)
+	query := `INSERT INTO thresholds (user_id, data_id, threshold_value, notify_user, created_at)
+	          VALUES ($1, $2, $3, $4, NOW()) RETURNING threshold_id`
+	err = tx.QueryRow(context.Background(), query, request.UserID, request.DataID, request.ThresholdValue, request.NotifyUser).
+		Scan(&thresholdID)
 
 	if err != nil {
-		log.Printf("Error inserting threshold: %v", err)
+		log.Printf("❌ Error Inserting Threshold: %v", err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("✅ Inserted Threshold: ID=%d", thresholdID)
+
 	for _, recipientID := range request.Recipients {
-		_, err := db.Exec(context.Background(), "INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES ($1, $2)", thresholdID, recipientID)
+		log.Printf("🔍 Attempting to insert recipient: ThresholdID=%d, RecipientID=%d", thresholdID, recipientID)
+
+		_, err := tx.Exec(context.Background(),
+			"INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES ($1, $2)",
+			thresholdID, recipientID)
+
 		if err != nil {
-			log.Printf("Error inserting recipient for threshold: %v", err)
+			log.Printf("❌ Error inserting recipient for threshold: %v", err)
 			http.Error(w, "Error associating recipients", http.StatusInternalServerError)
 			return
 		}
+
+		log.Printf("✅ Successfully inserted: ThresholdID=%d, RecipientID=%d", thresholdID, recipientID)
 	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		log.Printf("❌ Error Committing Transaction: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("✅ Threshold Created Successfully")
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -72,50 +99,61 @@ func CreateThreshold(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	})
 }
 
-func GetThresholds(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
+func GetThresholdById(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
+	log.Println("🔍 Fetching threshold by ID...")
 	vars := mux.Vars(r)
-	userID, err := strconv.Atoi(vars["userId"])
-	if err != nil || userID <= 0 {
-		http.Error(w, "Invalid or missing user ID", http.StatusBadRequest)
+	thresholdID, err := strconv.Atoi(vars["id"])
+	if err != nil || thresholdID <= 0 {
+		http.Error(w, "Invalid or missing threshold ID", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("🔍 Fetching details for threshold ID: %d", thresholdID)
 
 	type ThresholdWithRecipients struct {
 		ThresholdID    int     `json:"threshold_id"`
 		DataID         int     `json:"data_id"`
+		Name           string  `json:"name"`
 		ThresholdValue float64 `json:"threshold_value"`
-		NotifyUsers    bool    `json:"notify_user"`
-		Recipients     []int   `json:"recipients"`
+		NotifyUser     bool    `json:"notify_user"`
+		Recipients     []int64 `json:"recipients"`
 	}
 
-	var thresholds []ThresholdWithRecipients
+	var threshold ThresholdWithRecipients
 
 	query := `
-		SELECT t.threshold_id, t.data_id, t.threshold_value, t.notify_user, 
-		       COALESCE(ARRAY_AGG(tr.recipient_id) FILTER (WHERE tr.recipient_id IS NOT NULL), '{}') AS recipients
+		SELECT t.threshold_id, t.data_id, d.name, t.threshold_value, t.notify_user, 
+		       COALESCE(ARRAY_AGG(tr.recipient_id) FILTER (WHERE tr.recipient_id IS NOT NULL), ARRAY[]::BIGINT[]) AS recipients
 		FROM thresholds t
+		JOIN data d ON t.data_id = d.data_id
 		LEFT JOIN threshold_recipients tr ON t.threshold_id = tr.threshold_id
-		WHERE t.user_pool_id = $1
-		GROUP BY t.threshold_id
+		WHERE t.threshold_id = $1
+		GROUP BY t.threshold_id, d.name
 	`
-	rows, err := db.Query(context.Background(), query, userID)
-	if err != nil {
+	log.Printf("🔍 Executing query: %s with threshold_id=%d", query, thresholdID)
+
+	log.Printf("🔍 Executing query: %s with threshold_id=%d", query, thresholdID)
+
+	err = db.QueryRow(context.Background(), query, thresholdID).Scan(
+		&threshold.ThresholdID, &threshold.DataID, &threshold.Name,
+		&threshold.ThresholdValue, &threshold.NotifyUser, pq.Array(&threshold.Recipients),
+	)
+
+	if err == pgx.ErrNoRows {
+		log.Printf("✅ No threshold found for ID %d", thresholdID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{})
+		return
+	} else if err != nil {
+		log.Printf("❌ Database Query Error: %v", err)
 		http.Error(w, "Database query error", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var threshold ThresholdWithRecipients
-		if err := rows.Scan(&threshold.ThresholdID, &threshold.DataID, &threshold.ThresholdValue, &threshold.NotifyUsers, pq.Array(&threshold.Recipients)); err != nil {
-			http.Error(w, "Error scanning data", http.StatusInternalServerError)
-			return
-		}
-		thresholds = append(thresholds, threshold)
-	}
+	log.Printf("✅ Retrieved Threshold: %+v", threshold)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(thresholds)
+	json.NewEncoder(w).Encode(threshold)
 }
 
 func UpdateThreshold(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
@@ -133,35 +171,60 @@ func UpdateThreshold(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	}
 	defer r.Body.Close()
 
-	if !jsonFieldExists(body, "threshold_value") {
-		http.Error(w, "Missing required field: threshold_value", http.StatusBadRequest)
-		return
-	}
-
 	var threshold models.Threshold
 	if err := json.Unmarshal(body, &threshold); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("✏️ Updating Threshold ID %d: %+v", id, threshold)
+
+	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		http.Error(w, "Database transaction error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(context.Background())
+
 	query := `
 		UPDATE thresholds
-		SET threshold_value = $1
-		WHERE threshold_id = $2
-		RETURNING threshold_id, data_id, threshold_value
+		SET threshold_value = $1, notify_user = $2
+		WHERE threshold_id = $3
+		RETURNING threshold_id
 	`
-	err = db.QueryRow(context.Background(), query, threshold.ThresholdValue, id).
-		Scan(&threshold.ThresholdID, &threshold.DataID, &threshold.ThresholdValue)
+	err = tx.QueryRow(context.Background(), query, threshold.ThresholdValue, threshold.NotifyUser, id).Scan(&threshold.ThresholdID)
 	if err != nil {
-		log.Printf("Error updating threshold: %v", err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Printf("❌ Error updating threshold: %v", err)
+		http.Error(w, "Database update error", http.StatusInternalServerError)
 		return
 	}
 
+	_, err = tx.Exec(context.Background(), "DELETE FROM threshold_recipients WHERE threshold_id = $1", id)
+	if err != nil {
+		http.Error(w, "Error clearing recipients", http.StatusInternalServerError)
+		return
+	}
+
+	for _, recipientID := range threshold.Recipients {
+		_, err := tx.Exec(context.Background(),
+			"INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES ($1, $2)",
+			id, recipientID)
+		if err != nil {
+			http.Error(w, "Error updating recipients", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		http.Error(w, "Error committing transaction", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("✅ Successfully updated threshold ID %d", id)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":   "Threshold updated successfully",
-		"threshold": threshold,
+		"message": "Threshold updated successfully",
 	})
 }
 
@@ -195,23 +258,27 @@ func DeleteThreshold(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	json.NewEncoder(w).Encode(map[string]string{"message": "Threshold deleted successfully"})
 }
 
-func jsonFieldExists(body []byte, field string) bool {
-	var requestData map[string]interface{}
-	if err := json.Unmarshal(body, &requestData); err != nil {
-		return false
-	}
-	_, exists := requestData[field]
-	return exists
-}
+// func jsonFieldExists(body []byte, field string) bool {
+// 	var requestData map[string]interface{}
+// 	if err := json.Unmarshal(body, &requestData); err != nil {
+// 		return false
+// 	}
+// 	_, exists := requestData[field]
+// 	return exists
+// }
 
 func RegisterThresholdRoutes(router *mux.Router, db database.DBQuerier) {
-	router.HandleFunc("/thresholds/{userId}", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/thresholds/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
-			GetThresholds(w, r, db)
+			GetThresholdById(w, r, db)
+		} else if r.Method == "PUT" {
+			UpdateThreshold(w, r, db)
+		} else if r.Method == "DELETE" {
+			DeleteThreshold(w, r, db)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
-	}).Methods("GET")
+	}).Methods("GET", "PUT", "DELETE")
 
 	router.HandleFunc("/thresholds", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {

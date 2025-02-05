@@ -3,41 +3,25 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"megga-backend/models"
 	"megga-backend/services/database"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4"
+	"github.com/lib/pq"
 )
-
-func GetUsers(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	var users []models.User
-
-	rows, err := db.Query(context.Background(), "SELECT user_id, email, first_name, last_name FROM users")
-	if err != nil {
-		http.Error(w, "Database query error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var user models.User
-		if err := rows.Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName); err != nil {
-			http.Error(w, "Error scanning user data: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		users = append(users, user)
-	}
-	
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
-}
 
 func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	vars := mux.Vars(r)
-	email := vars["email"]
+	email, err := url.QueryUnescape(vars["email"])
+	if err != nil {
+		http.Error(w, "Invalid email encoding", http.StatusBadRequest)
+		return
+	}
 
 	if email == "" {
 		http.Error(w, "Email parameter is required", http.StatusBadRequest)
@@ -45,13 +29,14 @@ func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerie
 	}
 
 	var user models.User
-	query := "SELECT user_id, email, first_name, last_name FROM users WHERE email = $1"
-	err := db.QueryRow(context.Background(), query, email).Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName)
+	query := "SELECT user_id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)"
+	err = db.QueryRow(context.Background(), query, email).Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName)
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	} else if err != nil {
+		log.Printf("❌ Database error fetching user (%s): %v", email, err)
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -102,23 +87,149 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	})
 }
 
+func GetThresholdsForUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
+	vars := mux.Vars(r)
+	userID, err := strconv.Atoi(vars["userId"])
+	if err != nil || userID <= 0 {
+		http.Error(w, "Invalid or missing user ID", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("🔍 Fetching thresholds for user_id: %d", userID)
+
+	type ThresholdWithRecipients struct {
+		ThresholdID    int     `json:"threshold_id"`
+		DataID         int     `json:"data_id"`
+		Name           string  `json:"name"`
+		ThresholdValue float64 `json:"threshold_value"`
+		NotifyUser     bool    `json:"notify_user"`
+		Recipients     []int64 `json:"recipients"`
+	}
+
+	var thresholds []ThresholdWithRecipients
+
+	query := `
+		SELECT t.threshold_id, t.data_id, d.name, t.threshold_value, t.notify_user, 
+		       COALESCE(ARRAY_AGG(tr.recipient_id) FILTER (WHERE tr.recipient_id IS NOT NULL), ARRAY[]::BIGINT[]) AS recipients
+		FROM thresholds t
+		JOIN data d ON t.data_id = d.data_id
+		LEFT JOIN threshold_recipients tr ON t.threshold_id = tr.threshold_id
+		WHERE t.user_id = $1
+		GROUP BY t.threshold_id, d.name
+	`
+	log.Printf("🔍 Executing query: %s", query)
+
+	rows, err := db.Query(context.Background(), query, userID)
+	if err != nil {
+		log.Printf("❌ Database Query Error: %v", err)
+		http.Error(w, "Database query error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		log.Println("✅ No thresholds found, returning empty array.")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]ThresholdWithRecipients{})
+		return
+	}
+
+	for {
+		var threshold ThresholdWithRecipients
+		log.Println("🔍 Scanning row data...")
+
+		if err := rows.Scan(&threshold.ThresholdID, &threshold.DataID, &threshold.Name, &threshold.ThresholdValue, &threshold.NotifyUser, pq.Array(&threshold.Recipients)); err != nil {
+			log.Printf("❌ Error Scanning Data: %v", err)
+			http.Error(w, "Error scanning data", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("✅ Scanned Threshold: %+v", threshold)
+		thresholds = append(thresholds, threshold)
+
+		if !rows.Next() {
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(thresholds)
+}
+
+func DeleteAllThresholdsForUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
+	vars := mux.Vars(r)
+	userID, err := strconv.Atoi(vars["userId"])
+	if err != nil || userID <= 0 {
+		http.Error(w, "Invalid or missing user ID", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("🗑 Deleting all thresholds for user_id: %d...", userID)
+
+	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		log.Printf("❌ Error Starting Transaction: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(context.Background())
+
+	_, err = tx.Exec(context.Background(), "DELETE FROM threshold_recipients WHERE threshold_id IN (SELECT threshold_id FROM thresholds WHERE user_id = $1)", userID)
+	if err != nil {
+		log.Printf("❌ Error deleting threshold recipients: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = tx.Exec(context.Background(), "DELETE FROM thresholds WHERE user_id = $1", userID)
+	if err != nil {
+		log.Printf("❌ Error deleting thresholds: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		log.Printf("❌ Error Committing Transaction: %v", err)
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("✅ All thresholds deleted for user_id: %d", userID)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "All thresholds deleted successfully"})
+}
+
 func RegisterUserRoutes(router *mux.Router, db database.DBQuerier) {
 	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "POST":
+		if r.Method == "POST" {
 			CreateUser(w, r, db)
-		case "GET":
-			GetUsers(w, r, db)
-		default:
+		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
-	}).Methods("POST", "GET")
+	}).Methods("POST")
 
-	router.HandleFunc("/users/email/{email}", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/users/{email}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			GetUserByEmail(w, r, db)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}).Methods("GET")
+
+	router.HandleFunc("/users/{userId}/thresholds", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			GetThresholdsForUser(w, r, db)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}).Methods("GET")
+
+	router.HandleFunc("/users/{userId}/thresholds", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "DELETE" {
+			DeleteAllThresholdsForUser(w, r, db)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}).Methods("DELETE")
 }
