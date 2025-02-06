@@ -18,12 +18,12 @@ func InitDB() {
 	}
 
 	DB = dbPool
-	log.Println("Database connection established")
+	log.Println("🔗 Database connection established!")
 }
 
 func CloseDB() {
 	if DB != nil {
 		DB.Close()
-		log.Println("Database connection closed")
+		log.Println("🚪 Database connection closed")
 	}
 }

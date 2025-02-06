@@ -3,14 +3,13 @@ package main
 import (
 	"flag"
 	"log"
-	"megga-backend/devutils"
-	"megga-backend/services/database"
-	"megga-backend/services/env"
+	"megga-backend/internal/devutils"
+	"megga-backend/internal/database"
+	"megga-backend/internal/config"
 )
 
 func main() {
-	env.LoadEnv()
-	env.ValidateEnv()
+	config.LoadAndValidateEnv(".env.development")
 
 	migrate := flag.Bool("migrate", false, "Run database migrations")
 	seed := flag.Bool("seed", false, "Seed the database with test data")

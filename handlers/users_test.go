@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"megga-backend/middleware"
+	"megga-backend/internal/middleware"
 	"megga-backend/testutils"
 
 	"github.com/gorilla/mux"

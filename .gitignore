@@ -1,11 +1,15 @@
-# Logs
+# Logs & Debugging
 logs/
+*.log
 *.log.*
+trace.out
+pprof/
+debug/
 
-# MacOS
+# macOS system files
 .DS_Store
 
-# Editor directories and files
+# Editor & IDE directories/files
 .idea/
 .vscode/
 *.suo
@@ -14,10 +18,55 @@ logs/
 *.sln
 *.sw?
 
-# Go build artifacts
+# Go build artifacts (compiled binaries, temp files)
 megga-backend
 *.exe
 *.out
+*.test
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+*.bin
+*.obj
+*.a
+*.zip
+*.tar.gz
+/build/
+/pkg/
 
-# Environment variables
+# Dependency directories (if using `go mod vendor`, remove vendor/ from this list)
+vendor/
+
+# Temporary & cache files
+/tmp/
+.cache/
+*.tmp
+*.bak
+*.pid
+*.swp
+*.swo
+
+# Environment & Secrets
 .env
+env/
+env/.env.production
+env/.env.development
+config/.env
+secrets.json
+credentials.json
+*.key
+*.pem
+
+# Test coverage & reports
+cover.out
+test-results/
+coverage/
+*.coverprofile
+*.cov
+*.lcov
+
+# Git metadata
+*.orig
+*.rej

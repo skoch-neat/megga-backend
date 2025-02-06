@@ -2,8 +2,8 @@ package routes
 
 import (
 	"megga-backend/handlers"
-	"megga-backend/middleware"
-	"megga-backend/services/database"
+	"megga-backend/internal/middleware"
+	"megga-backend/internal/database"
 	"os"
 
 	"github.com/gorilla/mux"

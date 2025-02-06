@@ -3,8 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"megga-backend/models"
-	"megga-backend/services/database"
+	"megga-backend/internal/models"
+	"megga-backend/internal/database"
 	"net/http"
 	"strconv"
 

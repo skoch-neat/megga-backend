@@ -3,7 +3,7 @@ package devutils
 import (
 	"context"
 	"log"
-	"megga-backend/services/database"
+	"megga-backend/internal/database"
 )
 
 func MigrateDB(db database.DBQuerier) {

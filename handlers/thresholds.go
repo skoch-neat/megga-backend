@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	"megga-backend/models"
-	"megga-backend/services/database"
+	"megga-backend/internal/models"
+	"megga-backend/internal/database"
 	"net/http"
 	"strconv"
 

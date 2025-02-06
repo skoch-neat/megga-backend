@@ -48,7 +48,7 @@ func TestGetThresholds(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/thresholds", nil)
 	w := httptest.NewRecorder()
 
-	GetThresholds(w, req, mock)
+	GetThresholdsForUser(w, req, mock)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
