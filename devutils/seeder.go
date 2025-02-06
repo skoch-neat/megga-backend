@@ -12,12 +12,6 @@ func SeedDB(db database.DBQuerier) {
 		description string
 		query       string
 	}{
-		{"Inserting Users", `INSERT INTO users (email, first_name, last_name) VALUES 
-			('testuser1@example.com', 'Test', 'User1'),
-			('testuser2@example.com', 'Test', 'User2'),
-			('sarahkoch810@gmail.com', 'Sarah', 'Koch')
-			ON CONFLICT DO NOTHING;`}, // Delete my info after testing
-
 		{"Inserting Recipients", `INSERT INTO recipients (email, first_name, last_name, designation) VALUES 
 			('rep1@example.com', 'Jane', 'Doe', 'Representative'),
 			('rep2@example.com', 'John', 'Smith', 'Governor')

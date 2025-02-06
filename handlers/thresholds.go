@@ -258,15 +258,6 @@ func DeleteThreshold(w http.ResponseWriter, r *http.Request, db database.DBQueri
 	json.NewEncoder(w).Encode(map[string]string{"message": "Threshold deleted successfully"})
 }
 
-// func jsonFieldExists(body []byte, field string) bool {
-// 	var requestData map[string]interface{}
-// 	if err := json.Unmarshal(body, &requestData); err != nil {
-// 		return false
-// 	}
-// 	_, exists := requestData[field]
-// 	return exists
-// }
-
 func RegisterThresholdRoutes(router *mux.Router, db database.DBQuerier) {
 	router.HandleFunc("/thresholds/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
