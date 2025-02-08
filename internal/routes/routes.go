@@ -12,6 +12,7 @@ import (
 func RegisterRoutes(router *mux.Router, db database.DBQuerier) {
 	handlers.RegisterUserRoutes(router, db)
 	handlers.RegisterThresholdRoutes(router, db)
+	handlers.RegisterThresholdMonitorRoutes(router, db)
 	handlers.RegisterDataRoutes(router, db)
 	handlers.RegisterNotificationRoutes(router, db)
 	handlers.RegisterRecipientRoutes(router, db)

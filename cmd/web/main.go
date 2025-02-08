@@ -4,11 +4,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"megga-backend/internal/config"
+	"megga-backend/internal/database"
 	"megga-backend/internal/middleware"
 	"megga-backend/internal/routes"
-	"megga-backend/internal/database"
-	"megga-backend/internal/config"
+	"megga-backend/internal/services"
 
 	"github.com/gorilla/mux"
 )
@@ -44,6 +46,28 @@ func main() {
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
 	routes.RegisterRoutes(router, database.DB)
+
+	go func() {
+		log.Println("🔄 Starting BLS Data Fetcher...")
+		ticker := time.NewTicker(24 * time.Hour) // ✅ Fetch every 24 hours
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				log.Println("🔄 Fetching latest BLS data...")
+				blsData, err := services.FetchLatestBLSData()
+				if err != nil {
+					log.Printf("❌ Error fetching BLS data: %v", err)
+					continue
+				}
+				err = services.SaveBLSData(database.DB, blsData)
+				if err != nil {
+					log.Printf("❌ Error saving BLS data: %v", err)
+				}
+			}
+		}
+	}()
 
 	port := os.Getenv("PORT")
 	if port == "" {

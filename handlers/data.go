@@ -3,8 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"megga-backend/internal/models"
+	"log"
 	"megga-backend/internal/database"
+	"megga-backend/internal/models"
 	"net/http"
 	"strconv"
 
@@ -25,6 +26,18 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		return
 	}
 
+	var existingID int
+	checkQuery := `SELECT data_id FROM data WHERE series_id = $1`
+	err := db.QueryRow(context.Background(), checkQuery, data.SeriesID).Scan(&existingID)
+
+	if err == nil {
+		http.Error(w, "Duplicate series_id: This series already exists.", http.StatusConflict)
+		return
+	} else if err != pgx.ErrNoRows {
+		http.Error(w, "Database query error", http.StatusInternalServerError)
+		return
+	}
+
 	data.PreviousValue = data.LatestValue
 
 	query := `
@@ -32,12 +45,12 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
 		RETURNING data_id
 	`
-
-	err := db.QueryRow(context.Background(), query,
+	err = db.QueryRow(context.Background(), query,
 		data.Name, data.SeriesID, data.Type, data.Unit, data.PreviousValue, data.LatestValue, data.UpdateIntervalInDays).
 		Scan(&data.DataID)
 
 	if err != nil {
+		log.Printf("❌ Database error creating data: %v", err)
 		http.Error(w, "Database insert error", http.StatusInternalServerError)
 		return
 	}

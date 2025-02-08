@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	"megga-backend/internal/models"
 	"megga-backend/internal/database"
+	"megga-backend/internal/models"
 	"net/http"
 	"strconv"
 
@@ -199,19 +199,55 @@ func UpdateThreshold(w http.ResponseWriter, r *http.Request, db database.DBQueri
 		return
 	}
 
-	_, err = tx.Exec(context.Background(), "DELETE FROM threshold_recipients WHERE threshold_id = $1", id)
+	var existingRecipientIDs []int
+	getRecipientsQuery := `SELECT recipient_id FROM threshold_recipients WHERE threshold_id = $1`
+	rows, err := tx.Query(context.Background(), getRecipientsQuery, id)
 	if err != nil {
-		http.Error(w, "Error clearing recipients", http.StatusInternalServerError)
+		http.Error(w, "Error fetching existing recipients", http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
 
-	for _, recipientID := range threshold.Recipients {
-		_, err := tx.Exec(context.Background(),
-			"INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES ($1, $2)",
-			id, recipientID)
-		if err != nil {
-			http.Error(w, "Error updating recipients", http.StatusInternalServerError)
+	for rows.Next() {
+		var recipientID int
+		if err := rows.Scan(&recipientID); err != nil {
+			http.Error(w, "Error reading existing recipients", http.StatusInternalServerError)
 			return
+		}
+		existingRecipientIDs = append(existingRecipientIDs, recipientID)
+	}
+
+	newRecipientSet := make(map[int]bool)
+	for _, r := range threshold.Recipients {
+		newRecipientSet[r] = true
+	}
+
+	for _, existingID := range existingRecipientIDs {
+		if !newRecipientSet[existingID] {
+			deleteQuery := `DELETE FROM threshold_recipients WHERE threshold_id = $1 AND recipient_id = $2`
+			_, err := tx.Exec(context.Background(), deleteQuery, id, existingID)
+			if err != nil {
+				http.Error(w, "Error removing old recipients", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("❌ Removed recipient %d from threshold %d", existingID, id)
+		}
+	}
+
+	existingRecipientMap := make(map[int]bool)
+	for _, existingID := range existingRecipientIDs {
+		existingRecipientMap[existingID] = true
+	}
+
+	for _, newID := range threshold.Recipients {
+		if !existingRecipientMap[newID] {
+			insertQuery := `INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES ($1, $2)`
+			_, err := tx.Exec(context.Background(), insertQuery, id, newID)
+			if err != nil {
+				http.Error(w, "Error adding new recipients", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("✅ Added recipient %d to threshold %d", newID, id)
 		}
 	}
 
