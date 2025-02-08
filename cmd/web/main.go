@@ -74,6 +74,16 @@ func main() {
 		port = "8080"
 	}
 
+	log.Println("📌 Registered Routes:")
+	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		path, err := route.GetPathTemplate()
+		if err == nil {
+			methods, _ := route.GetMethods()
+			log.Printf("🔹 %s %s", methods, path)
+		}
+		return nil
+	})
+
 	log.Printf("🚀 Starting server on :%s, allowing frontend URL: %s", port, frontendURL)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, router))
 }
