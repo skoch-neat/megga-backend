@@ -4,18 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"megga-backend/internal/database"
+	"megga-backend/internal/services"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-// AllowedOrigins restricts CORS to only dev and prod frontends
-var AllowedOrigins = map[string]bool{
-	"http://localhost:5173":                     true, // Dev frontend
-	"https://main.dx8te9t0umpd8.amplifyapp.com": true, // Prod frontend
-}
-
-// Response structure
+// Response structure for API response
 type Response struct {
 	Message string `json:"message"`
 }
@@ -24,25 +20,37 @@ type Response struct {
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	log.Println("✅ Lambda function invoked!")
 
-	// Extract the request origin
-	origin := request.Headers["origin"]
-	if !AllowedOrigins[origin] {
-		log.Printf("❌ Unauthorized CORS request from: %s", origin)
+	// Fetch latest BLS data using the service function
+	blsData, err := services.FetchLatestBLSData()
+	if err != nil {
+		log.Printf("❌ Error fetching BLS data: %v", err)
 		return events.APIGatewayProxyResponse{
-			StatusCode: 403,
-			Body:       `{"error":"CORS policy does not allow this origin"}`,
+			StatusCode: 500,
+			Body:       `{"error":"Failed to fetch BLS data"}`,
 		}, nil
 	}
 
-	// Successful response
-	response := Response{Message: "✅ Backend connected successfully!"}
+	// Save BLS data to the database using the service function
+	err = services.SaveBLSData(database.DB, blsData)
+	if err != nil {
+		log.Printf("❌ Error saving BLS data: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"error":"Failed to save BLS data"}`,
+		}, nil
+	}
+
+	log.Println("✅ Successfully updated BLS data!")
+
+	// Return success response
+	response := Response{Message: "✅ BLS data updated successfully!"}
 	responseBody, _ := json.Marshal(response)
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
 			"Content-Type":                 "application/json",
-			"Access-Control-Allow-Origin":  origin, // ✅ Only allow valid origins
+			"Access-Control-Allow-Origin":  "*",
 			"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 			"Access-Control-Allow-Headers": "Content-Type",
 		},
@@ -51,6 +59,9 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 }
 
 func main() {
-	log.Println("🔗 Initializing AWS Lambda function...")
+	log.Println("🔗 Initializing AWS Lambda function for BLS data updates...")
+	database.InitDB()
+	defer database.CloseDB()
+
 	lambda.Start(handler)
 }
