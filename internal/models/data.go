@@ -12,4 +12,6 @@ type Data struct {
 	LatestValue          float64   `json:"latest_value" db:"latest_value"`               // Current value
 	LastUpdated          time.Time `json:"last_updated" db:"last_updated"`               // When updated
 	UpdateIntervalInDays int       `json:"update_interval_in_days" db:"update_interval"` // API update frequency
+	LastPeriod           string    `json:"last_period" db:"last_period"`                 // Last period
+	LastYear             string    `json:"last_year" db:"last_year"`                     // Last year
 }

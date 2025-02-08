@@ -49,21 +49,16 @@ func main() {
 
 	go func() {
 		log.Println("🔄 Starting BLS Data Fetcher...")
-		ticker := time.NewTicker(24 * time.Hour) // ✅ Fetch every 24 hours
+		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ticker.C:
 				log.Println("🔄 Fetching latest BLS data...")
-				blsData, err := services.FetchLatestBLSData()
+				err := services.FetchLatestBLSData(database.DB)
 				if err != nil {
 					log.Printf("❌ Error fetching BLS data: %v", err)
-					continue
-				}
-				err = services.SaveBLSData(database.DB, blsData)
-				if err != nil {
-					log.Printf("❌ Error saving BLS data: %v", err)
 				}
 			}
 		}

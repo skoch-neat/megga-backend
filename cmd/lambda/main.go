@@ -21,22 +21,12 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	log.Println("✅ Lambda function invoked!")
 
 	// Fetch latest BLS data using the service function
-	blsData, err := services.FetchLatestBLSData()
+	err := services.FetchLatestBLSData(database.DB)
 	if err != nil {
 		log.Printf("❌ Error fetching BLS data: %v", err)
 		return events.APIGatewayProxyResponse{
 			StatusCode: 500,
 			Body:       `{"error":"Failed to fetch BLS data"}`,
-		}, nil
-	}
-
-	// Save BLS data to the database using the service function
-	err = services.SaveBLSData(database.DB, blsData)
-	if err != nil {
-		log.Printf("❌ Error saving BLS data: %v", err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: 500,
-			Body:       `{"error":"Failed to save BLS data"}`,
 		}, nil
 	}
 
