@@ -62,6 +62,8 @@ func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerie
 			http.Error(w, "Database insert error", http.StatusInternalServerError)
 			return
 		}
+
+		w.WriteHeader(http.StatusCreated)
 	} else if err != nil {
 		log.Printf("❌ DEBUG: Database error fetching user (%s): %v", email, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
