@@ -22,6 +22,13 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 	Year   string
 	Period string
 }) error {
+	log.Println("💾 Saving BLS data to database...")
+
+	if len(blsData) == 0 {
+		log.Println("🔄 No BLS data to save.")
+		return nil
+	}
+
 	// ✅ Define the UPDATE query at the start
 	updateQuery := `UPDATE data 
 					SET previous_value = latest_value, 
@@ -31,7 +38,7 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 						last_updated = NOW() 
 					WHERE data_id = $4`
 
-	// ✅ Start a single transaction BEFORE looping
+	// ✅ Start a single transaction for all updates
 	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
@@ -42,18 +49,32 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 		}
 	}()
 
+	// Ensure rollback if any failure occurs
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback(context.Background()) // Ensure rollback on panic
+			log.Printf("❌ Transaction panicked: %v", p)
+		} else if err != nil {
+			log.Println("🔄 Rolling back transaction due to error:", err)
+			tx.Rollback(context.Background())
+		}
+	}()
+
 	// ✅ Track whether any updates occurred
 	updatesMade := false
 
 	for seriesID, data := range blsData {
 		var existing models.Data
-		err := db.QueryRow(context.Background(),
+		queryErr := db.QueryRow(context.Background(),
 			"SELECT data_id, latest_value, previous_value, year, period FROM data WHERE series_id = $1",
 			seriesID).Scan(&existing.DataID, &existing.LatestValue, &existing.PreviousValue, &existing.Year, &existing.Period)
 
-		if err != nil {
+		if queryErr == pgx.ErrNoRows {
 			log.Printf("⚠️ No existing record found for series: %s, skipping.", seriesID)
 			continue
+		} else if queryErr != nil {
+			err = fmt.Errorf("❌ Database query error: %w", queryErr)
+			return err // Ensures rollback triggers via `defer`
 		}
 
 		// ✅ If the new data is NOT newer, **skip** updating
