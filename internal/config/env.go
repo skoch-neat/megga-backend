@@ -24,7 +24,7 @@ func LoadEnv(envFile string) {
 func loadEnvFile(envFile string) {
 	err := godotenv.Load(envFile)
 	if err != nil {
-		log.Printf("⚠️ No %s .env file found, using system environment variables", envFile)
+		log.Printf("⚠️ No %s file found, using system environment variables", envFile)
 	} else {
 		log.Printf("✅ Loaded environment variables from %s", envFile)
 	}
