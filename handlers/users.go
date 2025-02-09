@@ -16,40 +16,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// DEBUG: ✅ Delete after testing
-func GetAllUsers(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-    query := "SELECT user_id, email, first_name, last_name FROM users"
-
-    rows, err := db.Query(context.Background(), query)
-    if err != nil {
-        log.Printf("❌ Database Query Error: %v", err)
-        http.Error(w, "Failed to fetch users", http.StatusInternalServerError)
-        return
-    }
-    defer rows.Close()
-
-    var users []models.User
-    for rows.Next() {
-        var user models.User
-        if err := rows.Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName); err != nil {
-            log.Printf("❌ Error scanning user row: %v", err)
-            http.Error(w, "Failed to read user data", http.StatusInternalServerError)
-            return
-        }
-        users = append(users, user)
-    }
-
-    if err := rows.Err(); err != nil {
-        log.Printf("❌ Error iterating user rows: %v", err)
-        http.Error(w, "Error processing user data", http.StatusInternalServerError)
-        return
-    }
-
-    log.Printf("✅ Retrieved %d users", len(users))
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(users)
-}
-
 func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	log.Println("🔍 DEBUG: Entering GetUserByEmail handler.")
 
@@ -278,24 +244,13 @@ func DeleteAllThresholdsForUser(w http.ResponseWriter, r *http.Request, db datab
 }
 
 func RegisterUserRoutes(router *mux.Router, db database.DBQuerier) {
-	// router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-	// 	if r.Method == "POST" {
-	// 		CreateUser(w, r, db)
-	// 	} else {
-	// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	// 	}
-	// }).Methods("POST")
-
 	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "POST":
+		if r.Method == "POST" {
 			CreateUser(w, r, db)
-		case "GET":
-			GetAllUsers(w, r, db) // ✅ Ensure this function exists
-		default:
+		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
-	}).Methods("GET", "POST") // ✅ DEBUG: Delete after testing
+	}).Methods("POST")
 
 	router.HandleFunc("/users/{email}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
