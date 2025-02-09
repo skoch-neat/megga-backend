@@ -17,60 +17,40 @@ import (
 )
 
 func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	log.Printf("🔍 DEBUG: Handler received request with headers: %+v", r.Header)
+	log.Println("🔍 DEBUG: Entering GetUserByEmail handler.")
 
-	vars := mux.Vars(r)
-	urlEmail := vars["email"]
-	if urlEmail == "" {
-		log.Println("❌ DEBUG: Email parameter missing from URL")
-		http.Error(w, "Email parameter is required", http.StatusBadRequest)
-		return
-	}
-
-	// Extract user info from headers instead of context
 	email := r.Header.Get("X-User-Email")
 	firstName := r.Header.Get("X-User-FirstName")
 	lastName := r.Header.Get("X-User-LastName")
 
+	log.Printf("🔍 Handler received request to fetch user by email: %s", email)
+
 	if email == "" || firstName == "" || lastName == "" {
-		log.Println("❌ DEBUG: Missing user information in headers")
+		log.Println("❌ DEBUG: Missing required user claims in headers")
 		http.Error(w, "Unauthorized: Missing user details", http.StatusUnauthorized)
 		return
 	}
 
-	log.Printf("🔍 DEBUG: Extracted user details: email=%s, firstName=%s, lastName=%s", email, firstName, lastName)
+	log.Printf("✅ DEBUG: Extracted user details - Email: %s, First Name: %s, Last Name: %s", email, firstName, lastName)
 
-	if urlEmail != email {
-		log.Printf("❌ DEBUG: Email mismatch: Requested=%s, JWT=%s", urlEmail, email)
-		http.Error(w, "Unauthorized: Email mismatch", http.StatusUnauthorized)
-		return
-	}
-
-	log.Println("✅ DEBUG: User is authenticated. Fetching from database...")
-
-	// Fetch user from DB
+	// ✅ Proceed as normal
 	var user models.User
+	log.Printf("🔍 Checking user by email: %s", email)  // Add this debug log
 	query := "SELECT user_id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)"
 	err := db.QueryRow(context.Background(), query, email).Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName)
 
 	if err == pgx.ErrNoRows {
-		log.Printf("⚠️ DEBUG: User not found: %s. Creating new user internally...", email)
-
+		log.Printf("⚠️ DEBUG: User not found, creating new user: %s", email)
 		user, err = CreateUserInternal(db, email, firstName, lastName)
 		if err != nil {
 			log.Printf("❌ DEBUG: Error creating user: %v", err)
 			http.Error(w, "Database insert error", http.StatusInternalServerError)
 			return
 		}
-
 		w.WriteHeader(http.StatusCreated)
-	} else if err != nil {
-		log.Printf("❌ DEBUG: Database error fetching user (%s): %v", email, err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
 	}
 
-	log.Printf("✅ DEBUG: User found: %+v", user)
+	log.Printf("✅ DEBUG: Returning user: %+v", user)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }

@@ -2,7 +2,6 @@ package handlers_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -14,9 +13,7 @@ import (
 
 	"megga-backend/handlers"
 	"megga-backend/internal/config"
-	"megga-backend/internal/middleware"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4"
 	"github.com/pashagolub/pgxmock"
@@ -35,17 +32,11 @@ func setupRouterWithMiddleware(mock pgxmock.PgxPoolIface) *mux.Router {
 
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			mockClaims := jwt.MapClaims{
-				"email":       "test@example.com",
-				"given_name":  "TestFirst",
-				"family_name": "TestLast",
-			}
-			log.Printf("🔍 DEBUG: Injecting claims in middleware: %+v", mockClaims) // ✅ Confirm claims exist
-			ctx := context.WithValue(r.Context(), middleware.ClaimsContextKey, mockClaims)
-			r = r.WithContext(ctx)
-
-			log.Printf("🔍 DEBUG: Context after setting claims in middleware: %+v", mockClaims)
-
+			log.Printf("🛠 Middleware injecting headers: email=%s, firstName=%s, lastName=%s",
+				r.Header.Get("X-User-Email"),
+				r.Header.Get("X-User-FirstName"),
+				r.Header.Get("X-User-LastName"),
+			)
 			next.ServeHTTP(w, r)
 		})
 	})
@@ -196,16 +187,16 @@ func TestGetUserByEmail_NotFound(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
 	req.Header.Set("X-User-Email", "notfound@example.com")
 	req.Header.Set("X-User-FirstName", "TestFirstName")
-	req.Header.Set("X-User-LastName", "TestLastName") // ✅ Inject claims as headers
+	req.Header.Set("X-User-LastName", "TestLastName")
 
 	w := httptest.NewRecorder()
 	router := setupRouterWithMiddleware(mock)
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200 (OK), got %d", w.Code)
+	if w.Code != http.StatusCreated {
+		t.Errorf("Expected status 201 (Created), got %d", w.Code)
 	}
-	
+
 	// Ensure mock expectations are met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet mock expectations: %v", err)
