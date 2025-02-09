@@ -7,6 +7,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+func IsDevelopment() bool {
+	return os.Getenv("ENVIRONMENT") == "development"
+}
+
 func LoadAndValidateEnv(envFile string) {
 	LoadEnv(envFile)
 	ValidateEnv()
