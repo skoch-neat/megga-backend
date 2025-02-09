@@ -3,11 +3,14 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"megga-backend/internal/config"
 	"megga-backend/internal/database"
 	"megga-backend/internal/models"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4"
@@ -21,8 +24,16 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		return
 	}
 
-	if data.Name == "" || data.SeriesID == "" || data.Type == "" || data.Unit == "" || data.LatestValue == 0 || data.UpdateIntervalInDays == 0 {
+	if data.SeriesID == "" || data.LatestValue == 0 {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	if info, exists := config.BLS_SERIES_INFO[data.SeriesID]; exists {
+		data.Name = info.Name
+		data.Unit = info.Unit
+	} else {
+		http.Error(w, "Invalid series_id", http.StatusBadRequest)
 		return
 	}
 
@@ -40,13 +51,21 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 
 	data.PreviousValue = data.LatestValue
 
+	if data.Period == "" {
+		data.Period = fmt.Sprintf("M%02d", time.Now().Month())
+	}
+
+	if data.Year == "" {
+		data.Year = fmt.Sprintf("%d", time.Now().Year())
+	}
+
 	query := `
-		INSERT INTO data (name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
+		INSERT INTO data (name, series_id, unit, previous_value, latest_value, last_updated, period, year)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8)
 		RETURNING data_id
 	`
-	err = db.QueryRow(context.Background(), query,
-		data.Name, data.SeriesID, data.Type, data.Unit, data.PreviousValue, data.LatestValue, data.UpdateIntervalInDays).
+	err = db.QueryRow(r.Context(), query,
+		data.Name, data.SeriesID, data.Unit, data.PreviousValue, data.LatestValue, data.Period, data.Year).
 		Scan(&data.DataID)
 
 	if err != nil {
@@ -63,14 +82,20 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 }
 
 func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	var dataEntries []models.Data
+	if config.IsDevelopment() {
+		log.Println("🔍 [DEBUG] Fetching all data...")
+	}
 
+	var dataEntries []models.Data
 	query := `
-		SELECT data_id, name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days
+		SELECT data_id, name, series_id, unit, previous_value, latest_value, last_updated, period, year
 		FROM data
 	`
 	rows, err := db.Query(context.Background(), query)
 	if err != nil {
+		if config.IsDevelopment() {
+			log.Printf("❌ [ERROR] Database query failed in GetData(): %v", err)
+		}
 		http.Error(w, "Database query error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -79,20 +104,19 @@ func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	for rows.Next() {
 		var data models.Data
 		if err := rows.Scan(
-			&data.DataID, &data.Name, &data.SeriesID, &data.Type, &data.Unit,
-			&data.PreviousValue, &data.LatestValue, &data.LastUpdated, &data.UpdateIntervalInDays,
+			&data.DataID, &data.Name, &data.SeriesID, &data.Unit,
+			&data.PreviousValue, &data.LatestValue, &data.LastUpdated, &data.Period, &data.Year,
 		); err != nil {
+			if config.IsDevelopment() {
+				log.Printf("❌ [ERROR] Error scanning data row in GetData(): %v", err)
+			}
 			http.Error(w, "Error scanning data: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if config.IsDevelopment() {
+			log.Printf("✅ [DEBUG] Fetched Data Row: %+v", data)
+		}
 		dataEntries = append(dataEntries, data)
-	}
-
-	if len(dataEntries) == 0 {
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]models.Data{})
-		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -109,18 +133,20 @@ func GetDataByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) 
 
 	var data models.Data
 	query := `
-		SELECT data_id, name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days
-		FROM data WHERE data_id = $1
-	`
+    SELECT data_id, name, series_id, unit, previous_value, latest_value, last_updated, period, year
+    FROM data WHERE data_id = $1
+`
 	err = db.QueryRow(context.Background(), query, id).Scan(
-		&data.DataID, &data.Name, &data.SeriesID, &data.Type, &data.Unit,
-		&data.PreviousValue, &data.LatestValue, &data.LastUpdated, &data.UpdateIntervalInDays,
+		&data.DataID, &data.Name, &data.SeriesID, &data.Unit,
+		&data.PreviousValue, &data.LatestValue, &data.LastUpdated, &data.Period, &data.Year,
 	)
 
 	if err == pgx.ErrNoRows {
+		log.Printf("✅ [DEBUG] No data found for ID: %d", id)
 		http.Error(w, "Data not found", http.StatusNotFound)
 		return
 	} else if err != nil {
+		log.Printf("❌ [ERROR] Database error in GetDataByID(): %v", err)
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -144,13 +170,22 @@ func UpdateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	}
 
 	query := `
-		UPDATE data
-		SET name = $1, series_id = $2, type = $3, unit = $4, latest_value = $5, update_interval_in_days = $6
-		WHERE data_id = $7
-	`
-	_, err = db.Exec(context.Background(), query, data.Name, data.SeriesID, data.Type, data.Unit, data.LatestValue, data.UpdateIntervalInDays, id)
+    UPDATE data
+    SET previous_value = latest_value,
+        latest_value = $1,
+        name = $2,
+        series_id = $3,
+        unit = $4,
+        period = $5,
+        year = $6,
+        last_updated = NOW()
+    WHERE data_id = $7
+`
+	_, err = db.Exec(context.Background(), query, data.LatestValue, data.Name, data.SeriesID, data.Unit, data.Period, data.Year, id)
+
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Printf("❌ [ERROR] Database error in UpdateData(): %v", err)
+		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -168,13 +203,15 @@ func DeleteData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 
 	query := "DELETE FROM data WHERE data_id = $1"
 	res, err := db.Exec(context.Background(), query, id)
+
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Printf("❌ [ERROR] Failed to delete data in DeleteData(): %v", err)
+		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	rowsAffected := res.RowsAffected()
-	if rowsAffected == 0 {
+	if res.RowsAffected() == 0 {
+		log.Printf("✅ [DEBUG] No data found for deletion (ID: %d)", id)
 		http.Error(w, "Data not found", http.StatusNotFound)
 		return
 	}
