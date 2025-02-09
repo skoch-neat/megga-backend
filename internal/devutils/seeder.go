@@ -12,31 +12,34 @@ func SeedDB(db database.DBQuerier) {
 		description string
 		query       string
 	}{
+		{"Inserting Users", `INSERT INTO users (email, first_name, last_name) VALUES 
+			('user1@example.com', 'Alice', 'Smith'),
+			('user2@example.com', 'Bob', 'Johnson')
+			ON CONFLICT DO NOTHING;`},
+
 		{"Inserting Recipients", `INSERT INTO recipients (email, first_name, last_name, designation) VALUES 
 			('rep1@example.com', 'Jane', 'Doe', 'Representative'),
 			('rep2@example.com', 'John', 'Smith', 'Governor')
 			ON CONFLICT DO NOTHING;`},
 
-		{"Inserting Data", `INSERT INTO data (name, series_id, type, unit, previous_value, latest_value, last_updated, update_interval_in_days) VALUES 
-			('Eggs', 'APU0000708111', 'Good', 'USD per dozen', 3.25, 3.50, NOW(), 30),
-			('Inflation', 'LEU0252881600', 'Indicator', '%', 2.5, 2.8, NOW(), 30)
+		{"Inserting Data", `INSERT INTO data (name, series_id, unit, previous_value, latest_value, last_updated, period, year) VALUES 
+			('Eggs', 'APU0000708111', 'per dozen', 3.25, 3.50, NOW(), 'M12', '2024'),
+			('Inflation', 'LEU0252881600', 'constant 1982-1984 dollars', 2.5, 2.8, NOW(), 'Q4', '2024')
 			ON CONFLICT DO NOTHING;`},
 
 		{"Inserting Thresholds", `INSERT INTO thresholds (user_id, data_id, threshold_value, created_at, notify_user) VALUES 
-			(1, 1, 5.0, NOW(), true),
-			(2, 2, 10.0, NOW(), false)
+			((SELECT user_id FROM users WHERE email = 'user1@example.com'), (SELECT data_id FROM data WHERE series_id = 'APU0000708111'), 5.0, NOW(), true),
+			((SELECT user_id FROM users WHERE email = 'user2@example.com'), (SELECT data_id FROM data WHERE series_id = 'LEU0252881600'), 10.0, NOW(), false)
 			ON CONFLICT DO NOTHING;`},
 
 		{"Inserting Threshold Recipients", `INSERT INTO threshold_recipients (threshold_id, recipient_id) VALUES 
-			(1, 1),
-			(1, 2),
-			(2, 2),
-			(2, 1)
+			((SELECT threshold_id FROM thresholds WHERE data_id = (SELECT data_id FROM data WHERE series_id = 'APU0000708111')), (SELECT recipient_id FROM recipients WHERE email = 'rep1@example.com')),
+			((SELECT threshold_id FROM thresholds WHERE data_id = (SELECT data_id FROM data WHERE series_id = 'LEU0252881600')), (SELECT recipient_id FROM recipients WHERE email = 'rep2@example.com'))
 			ON CONFLICT DO NOTHING;`},
 
 		{"Inserting Notifications", `INSERT INTO notifications (user_id, recipient_id, threshold_id, sent_at, user_msg, recipient_msg) VALUES 
-			(1, 1, 1, NOW(), 'Notification to User1', 'Notification to Recipient1'),
-			(2, 2, 2, NOW(), 'Notification to User2', 'Notification to Recipient2')
+			((SELECT user_id FROM users WHERE email = 'user1@example.com'), (SELECT recipient_id FROM recipients WHERE email = 'rep1@example.com'), (SELECT threshold_id FROM thresholds WHERE data_id = (SELECT data_id FROM data WHERE series_id = 'APU0000708111')), NOW(), 'Threshold Exceeded Alert', 'Threshold Notification for Recipient 1'),
+			((SELECT user_id FROM users WHERE email = 'user2@example.com'), (SELECT recipient_id FROM recipients WHERE email = 'rep2@example.com'), (SELECT threshold_id FROM thresholds WHERE data_id = (SELECT data_id FROM data WHERE series_id = 'LEU0252881600')), NOW(), 'Threshold Exceeded Alert', 'Threshold Notification for Recipient 2')
 			ON CONFLICT DO NOTHING;`},
 	}
 

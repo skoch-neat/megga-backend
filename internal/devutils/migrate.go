@@ -28,12 +28,12 @@ func MigrateDB(db database.DBQuerier) {
 			data_id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			series_id VARCHAR(255) UNIQUE NOT NULL,
-			type VARCHAR(255) NOT NULL,
 			unit VARCHAR(50),
 			previous_value FLOAT,
 			latest_value FLOAT,
 			last_updated TIMESTAMP DEFAULT NOW(),
-			update_interval_in_days INT
+			period VARCHAR(10),
+			year VARCHAR(10)
 		)`},
 		{"Creating Threshold table", `CREATE TABLE IF NOT EXISTS thresholds (
 			threshold_id SERIAL PRIMARY KEY,
