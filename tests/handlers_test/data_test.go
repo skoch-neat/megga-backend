@@ -247,11 +247,11 @@ func TestDeleteData_NotFound(t *testing.T) {
 }
 
 func TestRejectNegativeValues(t *testing.T) {
-	mockDB, err := pgxmock.NewPool()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer mockDB.Close()
+	defer mock.Close()
 
 	body := bytes.NewBufferString(`{
 		"series_id": "APU0000708111",
@@ -263,7 +263,7 @@ func TestRejectNegativeValues(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handlers.CreateData(w, req, mockDB)
+	handlers.CreateData(w, req, mock)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)

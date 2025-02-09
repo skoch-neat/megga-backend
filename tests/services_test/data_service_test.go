@@ -174,11 +174,11 @@ func TestSaveBLSData_IgnoreOldData(t *testing.T) {
 }
 
 func TestSaveBLSData_EmptyInput(t *testing.T) {
-	mockDB, err := pgxmock.NewPool()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer mockDB.Close()
+	defer mock.Close()
 
 	blsData := make(map[string]struct {
 		Value  float64
@@ -186,22 +186,22 @@ func TestSaveBLSData_EmptyInput(t *testing.T) {
 		Period string
 	})
 
-	err = services.SaveBLSData(mockDB, blsData)
+	err = services.SaveBLSData(mock, blsData)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if err := mockDB.ExpectationsWereMet(); err != nil {
+	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("❌ Unmet mock expectations: %v", err)
 	}
 }
 
 func TestSaveBLSData_UnexpectedAPIData(t *testing.T) {
-	mockDB, err := pgxmock.NewPool()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer mockDB.Close()
+	defer mock.Close()
 
 	blsData := map[string]struct {
 		Value  float64
@@ -211,7 +211,7 @@ func TestSaveBLSData_UnexpectedAPIData(t *testing.T) {
 		"UNKNOWN_SERIES": {Value: 10.50, Year: "2024", Period: "M12"},
 	}
 
-	err = services.SaveBLSData(mockDB, blsData)
+	err = services.SaveBLSData(mock, blsData)
 	if err == nil {
 		t.Errorf("Expected an error for unknown series, got nil")
 	}

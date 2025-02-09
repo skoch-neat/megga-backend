@@ -9,13 +9,13 @@ import (
 )
 
 func TestFetchBLSData_Timeout(t *testing.T) {
-	mockDB, err := pgxmock.NewPool()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer mockDB.Close()
+	defer mock.Close()
 
-	err = services.FetchLatestBLSData(mockDB) // Simulate timeout
+	err = services.FetchLatestBLSData(mock) // Simulate timeout
 	if err == nil {
 		t.Errorf("Expected timeout error, got nil")
 	}
