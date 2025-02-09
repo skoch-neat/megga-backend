@@ -2,20 +2,27 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"regexp"
-	"strings"
 	"testing"
 
 	"megga-backend/handlers"
+	"megga-backend/internal/config"
 	"megga-backend/internal/middleware"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4"
 	"github.com/pashagolub/pgxmock"
 )
+
+var MOCK_JWT_TOKEN = config.GetMockJWT()
 
 func setupRouterWithoutMiddleware(mock pgxmock.PgxPoolIface) *mux.Router {
 	router := mux.NewRouter()
@@ -25,10 +32,24 @@ func setupRouterWithoutMiddleware(mock pgxmock.PgxPoolIface) *mux.Router {
 
 func setupRouterWithMiddleware(mock pgxmock.PgxPoolIface) *mux.Router {
 	router := mux.NewRouter()
-	router.Use(middleware.ValidateCognitoToken(middleware.CognitoConfig{
-		UserPoolID: "test-pool-id",
-		Region:     "us-east-1",
-	}))
+
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mockClaims := jwt.MapClaims{
+				"email":       "test@example.com",
+				"given_name":  "TestFirst",
+				"family_name": "TestLast",
+			}
+			log.Printf("🔍 DEBUG: Injecting claims in middleware: %+v", mockClaims) // ✅ Confirm claims exist
+			ctx := context.WithValue(r.Context(), middleware.ClaimsContextKey, mockClaims)
+			r = r.WithContext(ctx)
+
+			log.Printf("🔍 DEBUG: Context after setting claims in middleware: %+v", mockClaims)
+
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	handlers.RegisterUserRoutes(router, mock)
 	return router
 }
@@ -40,15 +61,16 @@ func TestCreateUser_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	router := setupRouterWithoutMiddleware(mock)
+	router := setupRouterWithMiddleware(mock)
 
 	mock.ExpectQuery(`SELECT user_id FROM users WHERE email = \$1`).
 		WithArgs("test@example.com").
 		WillReturnError(pgx.ErrNoRows)
 
-	mock.ExpectQuery(`INSERT INTO users \(email, first_name, last_name\) VALUES \(\$1, \$2, \$3\) RETURNING user_id, email`).
+	mock.ExpectQuery(`INSERT INTO users \(email, first_name, last_name\) VALUES \(\$1, \$2, \$3\) RETURNING user_id, email, first_name, last_name`).
 		WithArgs("test@example.com", "First", "Last").
-		WillReturnRows(pgxmock.NewRows([]string{"user_id", "email"}).AddRow(1, "test@example.com"))
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "email", "first_name", "last_name"}).
+			AddRow(1, "test@example.com", "First", "Last"))
 
 	req := httptest.NewRequest("POST", "/users", bytes.NewBufferString(`{
 		"email": "test@example.com",
@@ -56,6 +78,7 @@ func TestCreateUser_Success(t *testing.T) {
 		"last_name": "Last"
 	}`))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -76,7 +99,7 @@ func TestCreateUser_UserAlreadyExists(t *testing.T) {
 	}
 	defer mock.Close()
 
-	router := setupRouterWithoutMiddleware(mock)
+	router := setupRouterWithMiddleware(mock)
 
 	mock.ExpectQuery(`SELECT user_id FROM users WHERE email = \$1`).
 		WithArgs("existing@example.com").
@@ -88,12 +111,20 @@ func TestCreateUser_UserAlreadyExists(t *testing.T) {
 		"last_name": "User"
 	}`))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if strings.TrimSpace(w.Body.String()) != `{"message":"User already exists","user":{"user_id":2,"email":"existing@example.com","first_name":"Existing","last_name":"User"}}` {
-		t.Errorf("Expected correct response, got %q", w.Body.String())
+	var expected map[string]interface{}
+	var actual map[string]interface{}
+
+	expectedJSON := `{"message":"User already exists","user":{"user_id":2,"email":"existing@example.com","first_name":"Existing","last_name":"User"}}`
+	json.Unmarshal([]byte(expectedJSON), &expected)
+	json.Unmarshal(w.Body.Bytes(), &actual)
+
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected response:\n%v\nGot:\n%v", expected, actual)
 	}
 }
 
@@ -126,8 +157,14 @@ func TestGetUserByEmail_Success(t *testing.T) {
 			AddRow(1, "test@example.com", "John", "Doe"))
 
 	req := httptest.NewRequest("GET", "/users/test@example.com", nil)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
+	req.Header.Set("X-User-Email", "test@example.com")
+	req.Header.Set("X-User-FirstName", "TestFirst")
+	req.Header.Set("X-User-LastName", "TestLast") // ✅ Inject claims as headers
+
 	w := httptest.NewRecorder()
-	router := setupRouterWithoutMiddleware(mock)
+	router := setupRouterWithMiddleware(mock)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -142,17 +179,36 @@ func TestGetUserByEmail_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
+	// First query: Check if user exists → returns ErrNoRows (not found)
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT user_id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`)).
 		WithArgs("notfound@example.com").
 		WillReturnError(pgx.ErrNoRows)
 
+	// Second query: Insert new user into the database
+	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO users (email, first_name, last_name) VALUES ($1, $2, $3) RETURNING user_id, email, first_name, last_name`)).
+		WithArgs("notfound@example.com", "TestFirstName", "TestLastName").
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "email", "first_name", "last_name"}).
+			AddRow(3, "notfound@example.com", "TestFirstName", "TestLastName"))
+
+	// Create a request with necessary headers for user creation
 	req := httptest.NewRequest("GET", "/users/notfound@example.com", nil)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
+	req.Header.Set("X-User-Email", "notfound@example.com")
+	req.Header.Set("X-User-FirstName", "TestFirstName")
+	req.Header.Set("X-User-LastName", "TestLastName") // ✅ Inject claims as headers
+
 	w := httptest.NewRecorder()
-	router := setupRouterWithoutMiddleware(mock)
+	router := setupRouterWithMiddleware(mock)
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("Expected status 404, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200 (OK), got %d", w.Code)
+	}
+	
+	// Ensure mock expectations are met
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unmet mock expectations: %v", err)
 	}
 }
 
@@ -171,10 +227,10 @@ func TestGetThresholdsForUser_Success(t *testing.T) {
 	LEFT JOIN threshold_recipients tr ON t.threshold_id = tr.threshold_id
 	WHERE t.user_id = $1
 	GROUP BY t.threshold_id, d.name`)).
-	WithArgs(1).
-	WillReturnRows(pgxmock.NewRows([]string{"threshold_id", "data_id", "name", "threshold_value", "notify_user", "recipients"}).
-		AddRow(101, 1, "Eggs", 10.0, true, []int64{1, 2}).
-		AddRow(102, 2, "Milk", 15.5, false, []int64{3}))
+		WithArgs(1).
+		WillReturnRows(pgxmock.NewRows([]string{"threshold_id", "data_id", "name", "threshold_value", "notify_user", "recipients"}).
+			AddRow(101, 1, "Eggs", 10.0, true, []int64{1, 2}).
+			AddRow(102, 2, "Milk", 15.5, false, []int64{3}))
 
 	req := httptest.NewRequest("GET", "/users/1/thresholds", nil)
 	w := httptest.NewRecorder()
