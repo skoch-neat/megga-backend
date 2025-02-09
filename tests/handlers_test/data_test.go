@@ -153,7 +153,7 @@ func TestUpdateData(t *testing.T) {
 	}
 	defer mock.Close()
 
-	mock.ExpectExec(regexp.QuoteMeta(`UPDATE data SET previous_value = latest_value, latest_value = $1, name = $2, series_id = $3, unit = $4, period = $5, year = $6, last_updated = NOW() WHERE data_id = $7`)).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE data SET previous_value = latest_value, latest_value = $1, name = $2, series_id = $3, unit = $4, period = $5, year = $6, last_updated = NOW() WHERE data_id = $7")).
 		WithArgs(200.0, "Updated Item", "SERIES_123", "kg", "M12", "2024", 42).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
@@ -243,5 +243,29 @@ func TestDeleteData_NotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Expected status %d, got %d", http.StatusNotFound, w.Code)
+	}
+}
+
+func TestRejectNegativeValues(t *testing.T) {
+	mockDB, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("Failed to create mock database: %v", err)
+	}
+	defer mockDB.Close()
+
+	body := bytes.NewBufferString(`{
+		"series_id": "APU0000708111",
+		"latest_value": -10.0,
+		"period": "M12",
+		"year": "2024"
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/data", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handlers.CreateData(w, req, mockDB)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
 }
