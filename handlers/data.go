@@ -24,8 +24,14 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		return
 	}
 
-	if data.SeriesID == "" || data.LatestValue == 0 {
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
+	if data.SeriesID == "" {
+		http.Error(w, "Missing required series_id", http.StatusBadRequest)
+		return
+	}
+
+	if data.LatestValue < 0 {
+		log.Printf("⚠️ [WARNING] Negative value received for %s: %.2f. Rejecting data.", data.SeriesID, data.LatestValue)
+		http.Error(w, "Invalid data: latest_value cannot be negative", http.StatusBadRequest)
 		return
 	}
 
@@ -61,7 +67,7 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 
 	query := `
 		INSERT INTO data (name, series_id, unit, previous_value, latest_value, last_updated, period, year)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8)
+		VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
 		RETURNING data_id
 	`
 	err = db.QueryRow(r.Context(), query,
