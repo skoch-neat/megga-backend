@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	// "github.com/joho/godotenv"
 )
 
 var DB *pgxpool.Pool
