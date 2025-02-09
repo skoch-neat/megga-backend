@@ -3,12 +3,39 @@ package config
 import (
 	"log"
 	"os"
+	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/joho/godotenv"
 )
 
-func IsDevelopment() bool {
-	return os.Getenv("ENVIRONMENT") == "development"
+func IsDevelopmentMode() bool {
+	return os.Getenv("APP_ENV") == "development"
+}
+
+func IsProductionMode() bool {
+	return os.Getenv("APP_ENV") == "production"
+}
+
+func GetMockJWT() string {
+	if !IsDevelopmentMode() {
+		return ""
+	}
+
+	claims := jwt.MapClaims{
+		"email":       "test@example.com",
+		"given_name":  "TestFirst",
+		"family_name": "TestLast",
+		"exp":         time.Now().Add(time.Hour).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	mockJWT, err := token.SignedString([]byte("mock-secret"))
+	if err != nil {
+		log.Fatalf("❌ Failed to generate mock JWT: %v", err)
+	}
+
+	return mockJWT
 }
 
 func LoadAndValidateEnv(envFile string) {
@@ -46,7 +73,7 @@ func ValidateEnv() {
 		"PORT",
 	}
 
-	if os.Getenv("ENVIRONMENT") == "development" {
+	if IsDevelopmentMode() {
 		requiredVars = append(requiredVars, "MOCK_JWT_TOKEN")
 	}
 

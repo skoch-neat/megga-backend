@@ -17,7 +17,7 @@ import (
 
 func main() {
 	envFile := "env/.env.development"
-	if os.Getenv("ENVIRONMENT") == "production" {
+	if config.IsProductionMode() {
 		envFile = "env/.env.production"
 	}
 

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 	"megga-backend/internal/devutils"
 	"megga-backend/internal/database"
 	"megga-backend/internal/config"
@@ -11,7 +10,7 @@ import (
 
 func main() {
 	envFile := "env/.env.development"
-	if os.Getenv("ENVIRONMENT") == "production" {
+	if config.IsProductionMode() {
 		envFile = "env/.env.production"
 	}
 

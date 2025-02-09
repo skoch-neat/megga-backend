@@ -88,7 +88,7 @@ func CreateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 }
 
 func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	if config.IsDevelopment() {
+	if config.IsDevelopmentMode() {
 		log.Println("🔍 [DEBUG] Fetching all data...")
 	}
 
@@ -99,7 +99,7 @@ func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	`
 	rows, err := db.Query(context.Background(), query)
 	if err != nil {
-		if config.IsDevelopment() {
+		if config.IsDevelopmentMode() {
 			log.Printf("❌ [ERROR] Database query failed in GetData(): %v", err)
 		}
 		http.Error(w, "Database query error: "+err.Error(), http.StatusInternalServerError)
@@ -113,13 +113,13 @@ func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 			&data.DataID, &data.Name, &data.SeriesID, &data.Unit,
 			&data.PreviousValue, &data.LatestValue, &data.LastUpdated, &data.Period, &data.Year,
 		); err != nil {
-			if config.IsDevelopment() {
+			if config.IsDevelopmentMode() {
 				log.Printf("❌ [ERROR] Error scanning data row in GetData(): %v", err)
 			}
 			http.Error(w, "Error scanning data: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if config.IsDevelopment() {
+		if config.IsDevelopmentMode() {
 			log.Printf("✅ [DEBUG] Fetched Data Row: %+v", data)
 		}
 		dataEntries = append(dataEntries, data)
