@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// ✅ Helper function to round a float to 2 decimal places
 func roundFloat(val float64, precision int) float64 {
 	multiplier := math.Pow(10, float64(precision))
 	return math.Round(val*multiplier) / multiplier
@@ -30,7 +29,6 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 		return nil
 	}
 
-	// ✅ Define the UPDATE query at the start
 	updateQuery := `UPDATE data 
 					SET previous_value = latest_value, 
 						latest_value = $1, 
@@ -43,7 +41,6 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 					VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
 					RETURNING data_id`
 
-	// ✅ Start a single transaction for all updates
 	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
@@ -54,7 +51,6 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 		}
 	}()
 
-	// Ensure rollback if any failure occurs
 	defer func() {
 		if p := recover(); p != nil {
 			tx.Rollback(context.Background()) // Ensure rollback on panic
@@ -65,7 +61,6 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 		}
 	}()
 
-	// ✅ Track whether any updates occurred
 	changesMade := false
 
 	for seriesID, data := range blsData {
@@ -93,26 +88,29 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 			}
 
 			changesMade = true
-			log.Printf("✅ Successfully inserted new record for %s", seriesID)
+			if config.IsDevelopmentMode() {
+				log.Printf("✅ Successfully inserted new record for %s", seriesID)
+			}
 			continue
 
 		} else if queryErr != nil {
 			err = fmt.Errorf("❌ Database query error: %w", queryErr)
-			return err // Ensures rollback triggers via `defer`
+			return err
 		}
 
-		// ✅ If the new data is NOT newer, **skip** updating
 		if data.Year == existing.Year && data.Period == existing.Period {
-			log.Printf("✅ No update needed for %s: %s-%s already exists. Skipping update.", seriesID, data.Year, data.Period)
+			if config.IsDevelopmentMode() {
+				log.Printf("✅ No update needed for %s: %s-%s already exists. Skipping update.", seriesID, data.Year, data.Period)
+			}
 			continue
 		}
 
-		// ✅ Update existing record
 		changesMade = true
 		roundedValue := roundFloat(data.Value, 2)
 
-		// ✅ Execute within the same transaction
-		log.Printf("🔄 Updating %s with value: %.2f, Year: %s, Period: %s", seriesID, roundedValue, data.Year, data.Period)
+		if config.IsDevelopmentMode() {
+			log.Printf("🔄 Updating %s with value: %.2f, Year: %s, Period: %s", seriesID, roundedValue, data.Year, data.Period)
+		}
 		_, err = tx.Exec(context.Background(), updateQuery, roundedValue, data.Year, data.Period, existing.DataID)
 
 		if err != nil {
@@ -120,20 +118,20 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 			return fmt.Errorf("error updating series %s: %w", seriesID, err)
 		}
 
-		log.Printf("✅ Successfully updated %s", seriesID)
+		if config.IsDevelopmentMode() {
+			log.Printf("✅ Successfully updated %s", seriesID)
+		}
 	}
 
-	// ✅ If NO updates were made, rollback instead of commit
 	if !changesMade {
 		log.Println("🔄 No updates were made, rolling back transaction.")
 		return tx.Rollback(context.Background()) // ✅ Return rollback instead of commit
 	}
 
-	// ✅ Commit transaction after all updates
 	if err := tx.Commit(context.Background()); err != nil {
 		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	log.Println("✅ All BLS data processed successfully.")
+	log.Println("✅ BLS data fetch completed successfully.")
 	return nil
 }
