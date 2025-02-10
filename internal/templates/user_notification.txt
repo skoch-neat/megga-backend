@@ -1,0 +1,20 @@
+Subject: Your MEGGA Threshold Was Hit - Here's What to Do Next
+
+Hi {UserFirstName},
+
+You set a threshold to monitor {ThresholdName}, and the latest data from the Bureau of Labor Statistics shows that it just crossed your set limit. Here’s what happened:
+
+New Value: {NewValue}
+Threshold: {ThresholdValue}
+Change Since Last Update: {ChangePercentage}%
+
+This means {GoodOrBad} news for consumers. These shifts don’t happen in a vacuum—Republican policies and legislative choices play a big role.
+
+We’ve sent a notification on your behalf to:
+{RecipientsList}
+
+But individual outreach makes a bigger impact. If you have time, consider calling their office, sending a follow-up email, or posting on social media to demand accountability. Republicans need to hear from you—loudly and often.
+
+Let’s keep the pressure on.
+
+MEGGA
