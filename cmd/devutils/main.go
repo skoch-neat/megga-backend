@@ -15,7 +15,7 @@ func main() {
 	}
 
 	log.Printf("🔍 Loading environment variables from: %s", envFile)
-	config.LoadAndValidateEnv(envFile)
+	config.LoadAndValidateEnv()
 
 	migrate := flag.Bool("migrate", false, "Run database migrations")
 	seed := flag.Bool("seed", false, "Seed the database with test data")
