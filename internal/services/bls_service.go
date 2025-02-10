@@ -102,14 +102,13 @@ func ParseBLSResponse(body []byte) (map[string]struct {
 
 func FetchLatestBLSData(db database.DBQuerier) error {
 	BLS_API_URL = getBLSAPIURL()
-	log.Printf("🌐 Making request to BLS API: %s", BLS_API_URL)
+	log.Println("🌐 Fetching latest BLS data...")
 
 	seriesIDs := make([]string, 0, len(config.BLS_SERIES_INFO))
 	for seriesID := range config.BLS_SERIES_INFO {
 		seriesIDs = append(seriesIDs, seriesID)
 	}
 
-	// Prepare request payload
 	payload := map[string]interface{}{
 		"seriesid":        seriesIDs,
 		"latest":          true,
@@ -140,7 +139,9 @@ func FetchLatestBLSData(db database.DBQuerier) error {
 		return fmt.Errorf("error reading response body: %w", err)
 	}
 
-	log.Printf("📥 BLS API response: %s", body)
+	if config.IsDevelopmentMode() {
+		log.Printf("📥 BLS API response: %s", body)
+	}
 
 	blsData, err := ParseBLSResponse(body)
 	if err != nil {
