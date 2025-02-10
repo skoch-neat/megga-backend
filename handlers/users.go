@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"megga-backend/internal/config"
 	"megga-backend/internal/database"
 	"megga-backend/internal/models"
 	"net/http"
@@ -17,51 +18,63 @@ import (
 )
 
 func GetUserByEmail(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	log.Println("🔍 DEBUG: Entering GetUserByEmail handler.")
+	if config.IsDevelopmentMode() {
+		log.Println("🔍 DEBUG: Entering GetUserByEmail handler.")
+	}
 
 	email := r.Header.Get("X-User-Email")
 	firstName := r.Header.Get("X-User-FirstName")
 	lastName := r.Header.Get("X-User-LastName")
 
-	log.Printf("🔍 Handler received request to fetch user by email: %s", email)
+	if config.IsDevelopmentMode() {
+		log.Printf("🔍 Handler received request to fetch user by email: %s", email)
+	}
 
 	if email == "" || firstName == "" || lastName == "" {
-		log.Println("❌ DEBUG: Missing required user claims in headers")
+		log.Println("❌ Missing required user claims in headers")
 		http.Error(w, "Unauthorized: Missing user details", http.StatusUnauthorized)
 		return
 	}
 
-	log.Printf("✅ DEBUG: Extracted user details - Email: %s, First Name: %s, Last Name: %s", email, firstName, lastName)
+	if config.IsDevelopmentMode() {
+		log.Printf("✅ Extracted user details - Email: %s, First Name: %s, Last Name: %s", email, firstName, lastName)
+	}
 
-	// ✅ Proceed as normal
 	var user models.User
-	log.Printf("🔍 Checking user by email: %s", email)  // Add this debug log
+	if config.IsDevelopmentMode() {
+		log.Printf("🔍 Checking user by email: %s", email)
+	}
 	query := "SELECT user_id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)"
 	err := db.QueryRow(context.Background(), query, email).Scan(&user.UserID, &user.Email, &user.FirstName, &user.LastName)
 
 	if err == pgx.ErrNoRows {
-		log.Printf("⚠️ DEBUG: User not found, creating new user: %s", email)
+		if config.IsDevelopmentMode() {
+			log.Printf("User not found, creating new user: %s", email)
+		}
 		user, err = CreateUserInternal(db, email, firstName, lastName)
 		if err != nil {
-			log.Printf("❌ DEBUG: Error creating user: %v", err)
+			log.Printf("❌ Error creating user: %v", err)
 			http.Error(w, "Database insert error", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	log.Printf("✅ DEBUG: Returning user: %+v", user)
+	if config.IsDevelopmentMode() {
+		log.Printf("✅ Returning user: %+v", user)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
-	log.Println("👤 Calling CreateUser...")
+	if config.IsDevelopmentMode() {
+		log.Println("👤 Calling CreateUser...")
 
-	// Read the request body for debugging
-	body, _ := io.ReadAll(r.Body)
-	log.Printf("📥 Request Body: %s", string(body))
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
+		body, _ := io.ReadAll(r.Body)
+		log.Printf("📥 Request Body: %s", string(body))
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
+	}
 
 	type NewUser struct {
 		Email     string `json:"email"`
@@ -71,25 +84,37 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 
 	var newUser NewUser
 	if err := json.NewDecoder(r.Body).Decode(&newUser); err != nil {
-		log.Printf("❌ JSON Decode Error: %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ JSON Decode Error: %v", err)
+		}
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	log.Printf("✅ Decoded User: %+v", newUser)
+
+	if config.IsDevelopmentMode() {
+		log.Printf("✅ Decoded User: %+v", newUser)
+	}
 
 	if newUser.Email == "" || newUser.FirstName == "" || newUser.LastName == "" {
-		log.Printf("❌ Missing required fields: %+v", newUser)
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ Missing required newUser fields: %+v", newUser)
+		}
+		http.Error(w, "Missing required newUser fields", http.StatusBadRequest)
 		return
 	}
 
 	var existingID int
 	query := "SELECT user_id FROM users WHERE email = $1"
-	log.Printf("🔍 Checking if user exists: %s", newUser.Email)
+
+	if config.IsDevelopmentMode() {
+		log.Printf("🔍 Checking if user exists: %s", newUser.Email)
+	}
 
 	err := db.QueryRow(context.Background(), query, newUser.Email).Scan(&existingID)
 	if err == nil {
-		log.Printf("✅ User already exists: %s", newUser.Email)
+		if config.IsDevelopmentMode() {
+			log.Printf("✅ User already exists: %s", newUser.Email)
+		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"message": "User already exists",
@@ -104,7 +129,9 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	}
 
 	if err == pgx.ErrNoRows {
-		log.Println("🆕 User does not exist. Proceeding with INSERT...")
+		if config.IsDevelopmentMode() {
+			log.Println("🆕 User does not exist. Proceeding with INSERT...")
+		}
 
 		query := `INSERT INTO users (email, first_name, last_name) VALUES ($1, $2, $3) RETURNING user_id, email, first_name, last_name`
 		var createdUser models.User
@@ -112,12 +139,16 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 			Scan(&createdUser.UserID, &createdUser.Email, &createdUser.FirstName, &createdUser.LastName)
 
 		if err != nil {
-			log.Printf("❌ Database INSERT Error: %v", err) // 🔥 THIS will tell us why INSERT fails!
+			if config.IsDevelopmentMode() {
+				log.Printf("❌ Database INSERT Error: %v", err)
+			}
 			http.Error(w, "Database insert error", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("✅ User successfully created: %+v", createdUser)
+		if config.IsDevelopmentMode() {
+			log.Printf("✅ User successfully created: %+v", createdUser)
+		}
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"message": "User created successfully",
@@ -126,7 +157,9 @@ func CreateUser(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 		return
 	}
 
-	log.Printf("❌ Unexpected Database Error: %v", err)
+	if config.IsDevelopmentMode() {
+		log.Printf("❌ Unexpected Database Error: %v", err)
+	}
 	http.Error(w, "Database query error", http.StatusInternalServerError)
 }
 
@@ -138,7 +171,9 @@ func GetThresholdsForUser(w http.ResponseWriter, r *http.Request, db database.DB
 		return
 	}
 
-	log.Printf("🔍 Fetching thresholds for user_id: %d", userID)
+	if config.IsDevelopmentMode() {
+		log.Printf("🔍 Fetching thresholds for user_id: %d", userID)
+	}
 
 	type ThresholdWithRecipients struct {
 		ThresholdID    int     `json:"threshold_id"`
@@ -160,18 +195,25 @@ func GetThresholdsForUser(w http.ResponseWriter, r *http.Request, db database.DB
 		WHERE t.user_id = $1
 		GROUP BY t.threshold_id, d.name
 	`
-	log.Printf("🔍 Executing query: %s", query)
+
+	if config.IsDevelopmentMode() {
+		log.Printf("🔍 Executing query: %s", query)
+	}
 
 	rows, err := db.Query(context.Background(), query, userID)
 	if err != nil {
-		log.Printf("❌ Database Query Error: %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ Database Query Error: %v", err)
+		}
 		http.Error(w, "Database query error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
 	if !rows.Next() {
-		log.Println("✅ No thresholds found, returning empty array.")
+		if config.IsDevelopmentMode() {
+			log.Println("✅ No thresholds found, returning empty array.")
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode([]ThresholdWithRecipients{})
 		return
@@ -179,15 +221,22 @@ func GetThresholdsForUser(w http.ResponseWriter, r *http.Request, db database.DB
 
 	for {
 		var threshold ThresholdWithRecipients
-		log.Println("🔍 Scanning row data...")
+
+		if config.IsDevelopmentMode() {
+			log.Println("🔍 Scanning row data...")
+		}
 
 		if err := rows.Scan(&threshold.ThresholdID, &threshold.DataID, &threshold.Name, &threshold.ThresholdValue, &threshold.NotifyUser, pq.Array(&threshold.Recipients)); err != nil {
-			log.Printf("❌ Error Scanning Data: %v", err)
+			if config.IsDevelopmentMode() {
+				log.Printf("❌ Error Scanning Data: %v", err)
+			}
 			http.Error(w, "Error scanning data", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("✅ Scanned Threshold: %+v", threshold)
+		if config.IsDevelopmentMode() {
+			log.Printf("✅ Scanned Threshold: %+v", threshold)
+		}
 		thresholds = append(thresholds, threshold)
 
 		if !rows.Next() {
@@ -207,11 +256,15 @@ func DeleteAllThresholdsForUser(w http.ResponseWriter, r *http.Request, db datab
 		return
 	}
 
-	log.Printf("🗑 Deleting all thresholds for user_id: %d...", userID)
+	if config.IsDevelopmentMode() {
+		log.Printf("🗑 Deleting all thresholds for user_id: %d...", userID)
+	}
 
 	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
-		log.Printf("❌ Error Starting Transaction: %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ Error Starting Transaction: %v", err)
+		}
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -219,25 +272,33 @@ func DeleteAllThresholdsForUser(w http.ResponseWriter, r *http.Request, db datab
 
 	_, err = tx.Exec(context.Background(), "DELETE FROM threshold_recipients WHERE threshold_id IN (SELECT threshold_id FROM thresholds WHERE user_id = $1)", userID)
 	if err != nil {
-		log.Printf("❌ Error deleting threshold recipients: %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ Error deleting threshold recipients: %v", err)
+		}
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	_, err = tx.Exec(context.Background(), "DELETE FROM thresholds WHERE user_id = $1", userID)
 	if err != nil {
-		log.Printf("❌ Error deleting thresholds: %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ Error deleting thresholds: %v", err)
+		}
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := tx.Commit(context.Background()); err != nil {
-		log.Printf("❌ Error Committing Transaction: %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ Error Committing Transaction: %v", err)
+		}
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("✅ All thresholds deleted for user_id: %d", userID)
+	if config.IsDevelopmentMode() {
+		log.Printf("✅ All thresholds deleted for user_id: %d", userID)
+	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "All thresholds deleted successfully"})
@@ -287,6 +348,8 @@ func CreateUserInternal(db database.DBQuerier, email, firstName, lastName string
 		return models.User{}, err
 	}
 
-	log.Printf("✅ DEBUG: User created in DB: %+v", user)
+	if config.IsDevelopmentMode() {
+		log.Printf("✅ DEBUG: User created in DB: %+v", user)
+	}
 	return user, nil
 }
