@@ -133,7 +133,6 @@ func FetchLatestBLSData(db database.DBQuerier) error {
 	}
 	defer resp.Body.Close()
 
-	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("error reading response body: %w", err)
@@ -147,6 +146,15 @@ func FetchLatestBLSData(db database.DBQuerier) error {
 	if err != nil {
 		return fmt.Errorf("error parsing BLS response: %w", err)
 	}
+
+	err = SaveBLSData(db, blsData)
+	if err != nil {
+		return fmt.Errorf("error saving BLS data: %w", err)
+	}
+
+	log.Println("✅ BLS data saved successfully.")
+
+	log.Println("🔍 Checking thresholds against updated BLS data...")
 
 	return SaveBLSData(db, blsData)
 }
