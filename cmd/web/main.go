@@ -51,13 +51,6 @@ func main() {
 
 	router := mux.NewRouter()
 
-	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", frontendURL)
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		w.WriteHeader(http.StatusOK)
-	})
-
 	router.Use(middleware.CORSConfig(frontendURL))
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 	routes.RegisterRoutes(router, database.DB)
