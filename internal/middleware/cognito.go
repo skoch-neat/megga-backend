@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"megga-backend/internal/config"
 	"net/http"
 	"strings"
 
@@ -20,86 +21,111 @@ type CognitoConfig struct {
 }
 
 func ValidateCognitoToken(cfg CognitoConfig) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            log.Println("🔍 DEBUG: Entering ValidateCognitoToken middleware.")
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if config.IsDevelopmentMode() {
+				log.Println("🔍 DEBUG: Entering ValidateCognitoToken middleware.")
+			}
 
-            authHeader := r.Header.Get("Authorization")
-            if authHeader == "" {
-                log.Println("❌ DEBUG: Missing Authorization header")
-                http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
-                return
-            }
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				if config.IsDevelopmentMode() {
+					log.Println("❌ DEBUG: Missing Authorization header")
+				}
+				http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+				return
+			}
 
-            tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-            log.Println("🔍 DEBUG: Extracted token:", tokenStr)
+			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-            // Validate JWT token
-            token, err := parseAndValidateToken(tokenStr, cfg)
-            if err != nil {
-                log.Println("❌ DEBUG: Token validation failed:", err)
-                http.Error(w, fmt.Sprintf("Invalid token: %v", err), http.StatusUnauthorized)
-                return
-            }
+			if config.IsDevelopmentMode() {
+				log.Println("🔍 DEBUG: Extracted token:", tokenStr)
+			}
 
-            claims, ok := token.Claims.(jwt.MapClaims)
-            if !ok {
-                log.Println("❌ DEBUG: Could not parse claims from token")
-                http.Error(w, "Unauthorized: Invalid claims", http.StatusUnauthorized)
-                return
-            }
+			token, err := parseAndValidateToken(tokenStr, cfg)
+			if err != nil {
+				if config.IsDevelopmentMode() {
+					log.Println("❌ DEBUG: Token validation failed:", err)
+				}
+				http.Error(w, fmt.Sprintf("Invalid token: %v", err), http.StatusUnauthorized)
+				return
+			}
 
-            // Log full claims for debugging
-            log.Printf("🔍 DEBUG: Full extracted claims: %+v", claims)
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok {
+				if config.IsDevelopmentMode() {
+					log.Println("❌ DEBUG: Could not parse claims from token")
+				}
+				http.Error(w, "Unauthorized: Invalid claims", http.StatusUnauthorized)
+				return
+			}
 
-            // Extract claims safely
-            email, emailOk := claims["email"].(string)
-            firstName, firstNameOk := claims["given_name"].(string)
-            lastName, lastNameOk := claims["family_name"].(string)
+			if config.IsDevelopmentMode() {
+				log.Printf("🔍 DEBUG: Full extracted claims: %+v", claims)
+			}
 
-            // If "email" claim is missing, try "username" instead (Cognito sometimes uses this)
-            if !emailOk {
-                email, emailOk = claims["username"].(string)
-            }
+			email, emailOk := claims["email"].(string)
+			firstName, firstNameOk := claims["given_name"].(string)
+			lastName, lastNameOk := claims["family_name"].(string)
 
-            // Ensure required claims exist
-            if !emailOk || !firstNameOk || !lastNameOk {
-                log.Printf("❌ DEBUG: Missing claims in JWT. email: %v, firstName: %v, lastName: %v", email, firstName, lastName)
-                http.Error(w, "Missing required claims", http.StatusUnauthorized)
-                return
-            }
+			if !emailOk || !firstNameOk || !lastNameOk {
+				if config.IsDevelopmentMode() {
+					log.Printf("❌ DEBUG: Missing claims in JWT. email: %v, firstName: %v, lastName: %v", email, firstName, lastName)
+				}
+				http.Error(w, "Missing required claims", http.StatusUnauthorized)
+				return
+			}
 
-            // Inject claims into headers
-            r.Header.Set("X-User-Email", email)
-            r.Header.Set("X-User-FirstName", firstName)
-            r.Header.Set("X-User-LastName", lastName)
+			r.Header.Set("X-User-Email", email)
+			r.Header.Set("X-User-FirstName", firstName)
+			r.Header.Set("X-User-LastName", lastName)
 
-            log.Printf("✅ DEBUG: JWT validated, claims injected. email=%s, firstName=%s, lastName=%s", email, firstName, lastName)
-            next.ServeHTTP(w, r)
-        })
-    }
+			if config.IsDevelopmentMode() {
+				log.Printf("✅ DEBUG: JWT validated, claims injected. email=%s, firstName=%s, lastName=%s", email, firstName, lastName)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func parseAndValidateToken(tokenStr string, cfg CognitoConfig) (*jwt.Token, error) {
 	jwksURL := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s/.well-known/jwks.json", cfg.Region, cfg.UserPoolID)
 
 	keyFunc := func(token *jwt.Token) (interface{}, error) {
+		if config.IsDevelopmentMode() {
+			log.Println("🔍 DEBUG: Validating JWT token.")
+		}
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			if config.IsDevelopmentMode() {
+				log.Println("❌ DEBUG: Unexpected signing method.")
+			}
 			return nil, errors.New("unexpected signing method")
 		}
 
 		jwks, err := fetchJWKS(jwksURL)
 		if err != nil {
+			if config.IsDevelopmentMode() {
+				log.Printf("❌ DEBUG: Failed to fetch JWKS: %v", err)
+			}
 			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
 		}
 
 		kid, ok := token.Header["kid"].(string)
 		if !ok {
+			if config.IsDevelopmentMode() {
+				log.Println("❌ DEBUG: Missing kid in token header.")
+			}
 			return nil, errors.New("missing kid in token header")
 		}
 		key, ok := jwks[kid]
 		if !ok {
+			if config.IsDevelopmentMode() {
+				log.Println("❌ DEBUG: Key not found in JWKS.")
+			}
 			return nil, errors.New("key not found in JWKS")
+		}
+		if config.IsDevelopmentMode() {
+			log.Println("✅ DEBUG: JWT validation successful.")
 		}
 
 		return key, nil
@@ -109,8 +135,14 @@ func parseAndValidateToken(tokenStr string, cfg CognitoConfig) (*jwt.Token, erro
 }
 
 func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
+	if config.IsDevelopmentMode() {
+		log.Printf("🔍 DEBUG: Fetching JWKS from URL: %s", jwksURL)
+	}
 	resp, err := http.Get(jwksURL)
 	if err != nil {
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ DEBUG: Failed to fetch JWKS: %v", err)
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -123,6 +155,9 @@ func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 		} `json:"keys"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ DEBUG: Failed to decode JWKS JSON: %v", err)
+		}
 		return nil, err
 	}
 
@@ -130,10 +165,16 @@ func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 	for _, key := range jwks.Keys {
 		nBytes, err := decodeBase64(key.N)
 		if err != nil {
+			if config.IsDevelopmentMode() {
+				log.Printf("❌ DEBUG: Failed to decode modulus: %v", err)
+			}
 			return nil, fmt.Errorf("failed to decode modulus: %w", err)
 		}
 		eBytes, err := decodeBase64ToInt(key.E)
 		if err != nil {
+			if config.IsDevelopmentMode() {
+				log.Printf("❌ DEBUG: Failed to decode exponent: %v", err)
+			}
 			return nil, fmt.Errorf("failed to decode exponent: %w", err)
 		}
 
@@ -143,6 +184,10 @@ func fetchJWKS(jwksURL string) (map[string]*rsa.PublicKey, error) {
 		}
 
 		keyMap[key.Kid] = pubKey
+	}
+
+	if config.IsDevelopmentMode() {
+		log.Println("✅ DEBUG: Successfully fetched and parsed JWKS.")
 	}
 
 	return keyMap, nil
