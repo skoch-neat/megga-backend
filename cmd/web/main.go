@@ -21,13 +21,19 @@ func main() {
 	database.InitDB()
 	defer database.CloseDB()
 
+	initBLS := os.Getenv("INIT_BLS") == "true"
+
 	go func() {
-		log.Println("⏳ Initializing BLS data...")
-		err := services.FetchLatestBLSData(database.DB)
-		if err != nil {
-			log.Printf("❌ Error initializing BLS data: %v", err)
+		if initBLS {
+			log.Println("⏳ INIT_BLS set to true. Initializing BLS data...")
+			err := services.FetchLatestBLSData(database.DB)
+			if err != nil {
+				log.Printf("❌ Error initializing BLS data: %v", err)
+			} else {
+				log.Println("✅ BLS data initialized successfully!")
+			}
 		} else {
-			log.Println("✅ BLS data initialized successfully!")
+			log.Println("⏳ INIT_BLS set to false. Skipping initial BLS data fetch.")
 		}
 
 		ticker := time.NewTicker(24 * time.Hour)
