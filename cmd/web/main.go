@@ -49,10 +49,17 @@ func main() {
 	}
 	frontendURL := os.Getenv("FRONTEND_URL")
 
+	log.Printf("🚀 DEBUG: FRONTEND_URL from env = %s", frontendURL)
+
 	router := mux.NewRouter()
 
+	// 🔴 Handle CORS Preflight Requests Globally
 	router.Use(middleware.CORSConfig(frontendURL))
+
+	// ✅ Apply authentication middleware
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
+
+	// ✅ Register application routes
 	routes.RegisterRoutes(router, database.DB)
 
 	if config.IsDevelopmentMode() {
