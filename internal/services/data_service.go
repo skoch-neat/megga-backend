@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"megga-backend/internal/config"
 	"megga-backend/internal/database"
 	"megga-backend/internal/models"
 
@@ -38,6 +39,10 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 						last_updated = NOW() 
 					WHERE data_id = $4`
 
+	insertQuery := `INSERT INTO data (name, series_id, unit, previous_value, latest_value, year, period, last_updated) 
+					VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
+					RETURNING data_id`
+
 	// ✅ Start a single transaction for all updates
 	tx, err := db.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
@@ -61,7 +66,7 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 	}()
 
 	// ✅ Track whether any updates occurred
-	updatesMade := false
+	changesMade := false
 
 	for seriesID, data := range blsData {
 		var existing models.Data
@@ -70,8 +75,27 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 			seriesID).Scan(&existing.DataID, &existing.LatestValue, &existing.PreviousValue, &existing.Year, &existing.Period)
 
 		if queryErr == pgx.ErrNoRows {
-			log.Printf("⚠️ No existing record found for series: %s, skipping.", seriesID)
+			log.Printf("⚠️ No existing record found for series: %s, inserting new record.", seriesID)
+
+			info, exists := config.BLS_SERIES_INFO[seriesID]
+			if !exists {
+				log.Printf("❌ No series info found for %s, skipping.", seriesID)
+				continue
+			}
+
+			roundedValue := roundFloat(data.Value, 2)
+
+			_, err = tx.Exec(context.Background(), insertQuery, info.Name, seriesID, info.Unit, roundedValue, roundedValue, data.Year, data.Period)
+
+			if err != nil {
+				log.Printf("❌ Error inserting new record for %s: %v", seriesID, err)
+				return fmt.Errorf("error inserting new record for series %s: %w", seriesID, err)
+			}
+
+			changesMade = true
+			log.Printf("✅ Successfully inserted new record for %s", seriesID)
 			continue
+
 		} else if queryErr != nil {
 			err = fmt.Errorf("❌ Database query error: %w", queryErr)
 			return err // Ensures rollback triggers via `defer`
@@ -83,10 +107,8 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 			continue
 		}
 
-		// ✅ If an update occurs, set `updatesMade = true`
-		updatesMade = true
-
-		// ✅ Round the value before updating the database
+		// ✅ Update existing record
+		changesMade = true
 		roundedValue := roundFloat(data.Value, 2)
 
 		// ✅ Execute within the same transaction
@@ -102,7 +124,7 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 	}
 
 	// ✅ If NO updates were made, rollback instead of commit
-	if !updatesMade {
+	if !changesMade {
 		log.Println("🔄 No updates were made, rolling back transaction.")
 		return tx.Rollback(context.Background()) // ✅ Return rollback instead of commit
 	}
