@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"megga-backend/internal/config"
 	"megga-backend/internal/database"
 	"megga-backend/internal/models"
 	"net/http"
@@ -83,19 +84,25 @@ func GetRecipientByID(w http.ResponseWriter, r *http.Request, db database.DBQuer
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok || idStr == "" {
-		log.Println("❌ Invalid recipient ID received:", vars)
+		if config.IsDevelopmentMode() {
+			log.Println("❌ Invalid recipient ID received:", vars)
+		}
 		http.Error(w, "Invalid recipient ID", http.StatusBadRequest)
 		return
 	}
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		log.Println("❌ Unable to convert ID:", idStr)
+		if config.IsDevelopmentMode() {
+			log.Println("❌ Unable to convert ID:", idStr)
+		}
 		http.Error(w, "Invalid recipient ID", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("✅ Extracted Recipient ID: %d", id)
+	if config.IsDevelopmentMode() {
+		log.Printf("✅ Extracted Recipient ID: %d", id)
+	}
 
 	var recipient models.Recipient
 	query := `

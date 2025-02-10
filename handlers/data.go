@@ -152,11 +152,15 @@ func GetDataByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) 
 	)
 
 	if err == pgx.ErrNoRows {
-		log.Printf("✅ [DEBUG] No data found for ID: %d", id)
+		if config.IsDevelopmentMode() {
+			log.Printf("✅ [DEBUG] No data found for ID: %d", id)
+		}
 		http.Error(w, "Data not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		log.Printf("❌ [ERROR] Database error in GetDataByID(): %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ [ERROR] Database error in GetDataByID(): %v", err)
+		}
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -194,7 +198,9 @@ func UpdateData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	_, err = db.Exec(context.Background(), query, data.LatestValue, data.Name, data.SeriesID, data.Unit, data.Period, data.Year, id)
 
 	if err != nil {
-		log.Printf("❌ [ERROR] Database error in UpdateData(): %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ [ERROR] Database error in UpdateData(): %v", err)
+		}
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -215,13 +221,17 @@ func DeleteData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	res, err := db.Exec(context.Background(), query, id)
 
 	if err != nil {
-		log.Printf("❌ [ERROR] Failed to delete data in DeleteData(): %v", err)
+		if config.IsDevelopmentMode() {
+			log.Printf("❌ [ERROR] Failed to delete data in DeleteData(): %v", err)
+		}
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if res.RowsAffected() == 0 {
-		log.Printf("✅ [DEBUG] No data found for deletion (ID: %d)", id)
+		if config.IsDevelopmentMode() {
+			log.Printf("✅ [DEBUG] No data found for deletion (ID: %d)", id)
+		}
 		http.Error(w, "Data not found", http.StatusNotFound)
 		return
 	}

@@ -132,6 +132,6 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	log.Println("✅ BLS data fetch completed successfully.")
+	log.Println("✅ BLS data fetch complete.")
 	return nil
 }

@@ -22,7 +22,7 @@ func main() {
 	defer database.CloseDB()
 
 	go func() {
-		log.Println("⏳ Fetching BLS data now, then scheduling updates every 24 hours...")
+		log.Println("⏳ Initializing BLS data...")
 		err := services.FetchLatestBLSData(database.DB)
 		if err != nil {
 			log.Printf("❌ Error initializing BLS data: %v", err)
@@ -49,13 +49,17 @@ func main() {
 	}
 	frontendURL := os.Getenv("FRONTEND_URL")
 
-	log.Printf("🚀 DEBUG: FRONTEND_URL from env = %s", frontendURL)
+	if config.IsDevelopmentMode() {
+		log.Printf("🚀 DEBUG: FRONTEND_URL from env = %s", frontendURL)
+	}
 
 	router := mux.NewRouter()
 
 	// 🔴 Ensure OPTIONS requests are handled before anything else
 	router.PathPrefix("/").Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("✅ DEBUG: Handling global CORS preflight request (OPTIONS)")
+		if config.IsDevelopmentMode() {
+			log.Println("✅ DEBUG: Handling global CORS preflight request (OPTIONS)")
+		}
 		frontendURL := os.Getenv("FRONTEND_URL")
 		w.Header().Set("Access-Control-Allow-Origin", frontendURL)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -88,11 +92,9 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
-		log.Println("⚠️ PORT is not set, using default: ", port)
-	} else {
-		if config.IsDevelopmentMode() {
-			log.Println("✅ PORT is set to: ", port)
-		}
+	}
+	if config.IsDevelopmentMode() {
+		log.Println("✅ PORT is set to: ", port)
 	}
 
 	addr := fmt.Sprintf(":%s", port)

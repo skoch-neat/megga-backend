@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"log"
+	"megga-backend/internal/config"
 	"net/http"
 
 	"github.com/rs/cors"
@@ -10,10 +11,11 @@ import (
 func CORSConfig(frontendURL string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// 🔍 Debugging: Print incoming request method and headers
-			log.Printf("🔍 DEBUG: Request Method = %s", r.Method)
-			log.Printf("🔍 DEBUG: Request Headers = %+v", r.Header)
-			log.Printf("🔍 DEBUG: MethodOptions = %s", http.MethodOptions)
+			if config.IsDevelopmentMode() {
+				log.Printf("🔍 DEBUG: Request Method = %s", r.Method)
+				log.Printf("🔍 DEBUG: Request Headers = %+v", r.Header)
+				log.Printf("🔍 DEBUG: MethodOptions = %s", http.MethodOptions)
+			}
 
 			// 🔴 Set CORS headers for ALL responses
 			w.Header().Set("Access-Control-Allow-Origin", frontendURL)
@@ -23,7 +25,9 @@ func CORSConfig(frontendURL string) func(http.Handler) http.Handler {
 
 			// ✅ Explicitly handle preflight (OPTIONS) requests
 			if r.Method == http.MethodOptions {
-				log.Println("✅ DEBUG: Handling CORS preflight request (OPTIONS)")
+				if config.IsDevelopmentMode() {
+					log.Println("✅ DEBUG: Handling CORS preflight request (OPTIONS)")
+				}
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
