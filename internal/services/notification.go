@@ -22,8 +22,14 @@ type EmailPayload struct {
 	Body      string `json:"body"`
 }
 
-func SendThresholdNotifications(threshold models.Threshold, dataName string, percentChange float64) {
+func SendNotifications(db database.DBQuerier, threshold models.Threshold, dataName string, percentChange float64) {
 	log.Println("📨 Preparing notifications for threshold ID:", threshold.ThresholdID)
+
+	recipients, err := fetchRecipientsForThreshold(db, threshold.ThresholdID) // ✅ Pass db here
+	if err != nil {
+		log.Printf("❌ Failed to fetch recipients for threshold %d: %v", threshold.ThresholdID, err)
+		return
+	}
 
 	thresholdExceeded := percentChange > threshold.ThresholdValue
 	emailTemplate := "recipient_notification_negative.txt"
@@ -31,31 +37,34 @@ func SendThresholdNotifications(threshold models.Threshold, dataName string, per
 		emailTemplate = "recipient_notification_positive.txt"
 	}
 
-	recipients, err := fetchRecipientsForThreshold(threshold.ThresholdID)
-	if err != nil {
-		log.Printf("❌ Failed to fetch recipients for threshold %d: %v", threshold.ThresholdID, err)
-		return
-	}
-
-	for _, recipient := range recipients {
-		subject := fmt.Sprintf("Urgent: %s Economic Data Alert", dataName)
-		message, err := formatEmailFromTemplate(emailTemplate, map[string]string{
-			"Recipient Name":    recipient.FirstName + " " + recipient.LastName,
-			"Threshold Name":    dataName,
-			"Change Percentage": fmt.Sprintf("%.2f", percentChange),
-			"User First Name":   os.Getenv("SENDER_FIRST_NAME"),
-			"User Last Name":    os.Getenv("SENDER_LAST_NAME"),
-			"User Email":        os.Getenv("SENDER_EMAIL"),
-		})
-		if err != nil {
-			log.Printf("❌ Error formatting recipient email: %v", err)
-			continue
+	// ✅ Send recipient notifications if applicable
+	if len(recipients) > 0 {
+		for _, recipient := range recipients {
+			subject := fmt.Sprintf("Urgent: %s Economic Data Alert", dataName)
+			message, err := formatEmailFromTemplate(emailTemplate, map[string]string{
+				"Recipient Name":    recipient.FirstName + " " + recipient.LastName,
+				"Threshold Name":    dataName,
+				"Change Percentage": fmt.Sprintf("%.2f", percentChange),
+				"User First Name":   os.Getenv("SENDER_FIRST_NAME"),
+				"User Last Name":    os.Getenv("SENDER_LAST_NAME"),
+				"User Email":        os.Getenv("SENDER_EMAIL"),
+			})
+			if err != nil {
+				log.Printf("❌ Error formatting recipient email: %v", err)
+				continue
+			}
+			sendEmail(recipient.Email, subject, message)
 		}
-		sendEmail(recipient.Email, subject, message)
 	}
 
+	// ✅ Send user notification if opted in
 	if threshold.NotifyUser {
 		userEmail := fetchUserEmail(threshold.UserID)
+		if userEmail == "" {
+			log.Printf("❌ User email not found for User ID %d, skipping user notification", threshold.UserID)
+			return
+		}
+
 		userMessage, err := formatEmailFromTemplate("user_notification.txt", map[string]string{
 			"User First Name":   os.Getenv("SENDER_FIRST_NAME"),
 			"Threshold Name":    dataName,
@@ -74,9 +83,9 @@ func SendThresholdNotifications(threshold models.Threshold, dataName string, per
 }
 
 // fetchRecipientsForThreshold retrieves all recipients tied to a threshold.
-func fetchRecipientsForThreshold(thresholdID int) ([]models.Recipient, error) {
+func fetchRecipientsForThreshold(db database.DBQuerier, thresholdID int) ([]models.Recipient, error) {
 	var recipients []models.Recipient
-	rows, err := database.DB.Query(context.Background(), `
+	rows, err := db.Query(context.Background(), `
 		SELECT r.recipient_id, r.email, r.first_name, r.last_name, r.designation
 		FROM recipients r
 		JOIN threshold_recipients tr ON r.recipient_id = tr.recipient_id
@@ -93,6 +102,8 @@ func fetchRecipientsForThreshold(thresholdID int) ([]models.Recipient, error) {
 		}
 		recipients = append(recipients, recipient)
 	}
+
+	log.Printf("✅ Fetched %d recipients for threshold ID: %d", len(recipients), thresholdID)
 	return recipients, nil
 }
 
@@ -179,50 +190,4 @@ func sendEmail(to, subject, body string) error {
 
 	log.Printf("📧 Successfully sent email to %s with subject: %s", to, subject)
 	return nil
-}
-
-
-func SendNotifications(db database.DBQuerier, threshold models.Threshold, dataName string, percentChange float64) {
-	log.Println("📨 Preparing notifications for threshold ID:", threshold.ThresholdID)
-
-	recipients, err := fetchRecipientsForThreshold(threshold.ThresholdID)
-	if err != nil {
-		log.Printf("❌ Failed to fetch recipients for threshold %d: %v", threshold.ThresholdID, err)
-		return
-	}
-
-	if len(recipients) > 0 {
-		
-	thresholdExceeded := percentChange > threshold.ThresholdValue
-	emailTemplate := "recipient_notification_negative.txt"
-	if !thresholdExceeded {
-		emailTemplate = "recipient_notification_positive.txt"
-	}
-
-	for _, recipient := range recipients {
-		subject := fmt.Sprintf("Urgent: %s Economic Data Alert", dataName)
-			message, err := formatEmailFromTemplate(emailTemplate, map[string]string{
-				"Recipient Name":    recipient.FirstName + " " + recipient.LastName,
-				"Threshold Name":    dataName,
-				"Change Percentage": fmt.Sprintf("%.2f", percentChange),
-				"User First Name":   os.Getenv("SENDER_FIRST_NAME"),
-				"User Last Name":    os.Getenv("SENDER_LAST_NAME"),
-				"User Email":        os.Getenv("SENDER_EMAIL"),
-			})
-			if err != nil {
-				log.Printf("❌ Error formatting recipient email: %v", err)
-				continue
-			}
-			sendEmail(recipient.Email, subject, message)
-		}
-	}
-
-	if threshold.NotifyUser {
-		userEmail := fetchUserEmail(threshold.UserID)
-		userMessage := fmt.Sprintf(
-			"Hello,\n\nYour MEGGA threshold for %s has been hit. The change was %.2f%%, exceeding your set threshold of %.2f%%.\n\nBest,\nMEGGA",
-			dataName, percentChange, threshold.ThresholdValue,
-		)
-		sendEmail(userEmail, "Your MEGGA Threshold Was Hit - Here's What to Do Next", userMessage)
-	}
 }
