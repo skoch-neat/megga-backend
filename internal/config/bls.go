@@ -4,6 +4,8 @@ import "os"
 
 // BLS API Key (Loaded from .env)
 var BLS_API_KEY = os.Getenv("BLS_API_KEY")
+var BLS_API_URL = os.Getenv("BLS_API_URL")
+
 
 // BLS Series IDs
 var BLS_SERIES_INFO = map[string]struct {

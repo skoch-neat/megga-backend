@@ -17,9 +17,30 @@ import (
 
 // BLS API URL
 var BLS_API_URL = getBLSAPIURL()
+var BLS_API_KEY = getBLSAPIKey()
 
 func getBLSAPIURL() string {
-	return os.Getenv("BLS_API_URL")
+	var blsURL = os.Getenv("BLS_API_URL")
+	if config.IsDevelopmentMode() {
+		if blsURL == "" {
+			log.Fatal("BLS_API_URL is not set, check your environment variables")
+		} else {
+			log.Println("BLS_API_URL is set: ", blsURL)
+		}
+	}
+	return blsURL
+}
+
+func getBLSAPIKey() string {
+	var blsAPIKey = os.Getenv("BLS_API_KEY")
+	if config.IsDevelopmentMode() {
+		if blsAPIKey == "" {
+			log.Fatal("BLS_API_KEY is not set, check your environment variables")
+		} else {
+			log.Println("BLS_API_KEY is set: ", blsAPIKey)
+		}
+	}
+	return blsAPIKey
 }
 
 // Structs to parse API response
@@ -29,9 +50,9 @@ type BLSResponse struct {
 		Series []struct {
 			SeriesID string `json:"seriesID"`
 			Data     []struct {
-				Year       string `json:"year"`
-				Period     string `json:"period"`
-				Value      string `json:"value"`
+				Year   string `json:"year"`
+				Period string `json:"period"`
+				Value  string `json:"value"`
 			} `json:"data"`
 		} `json:"series"`
 	} `json:"Results"`
@@ -79,9 +100,9 @@ func ParseBLSResponse(body []byte) (map[string]struct {
 	return blsData, nil
 }
 
-// FetchLatestBLSData requests the latest BLS data and updates the database
 func FetchLatestBLSData(db database.DBQuerier) error {
-	log.Println("📡 Fetching latest BLS data...")
+	BLS_API_URL = getBLSAPIURL()
+	log.Printf("🌐 Making request to BLS API: %s", BLS_API_URL)
 
 	seriesIDs := make([]string, 0, len(config.BLS_SERIES_INFO))
 	for seriesID := range config.BLS_SERIES_INFO {
@@ -125,6 +146,6 @@ func FetchLatestBLSData(db database.DBQuerier) error {
 	if err != nil {
 		return fmt.Errorf("error parsing BLS response: %w", err)
 	}
-	
+
 	return SaveBLSData(db, blsData)
 }
