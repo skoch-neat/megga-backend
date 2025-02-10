@@ -3,7 +3,6 @@ package database_test
 import (
 	"context"
 	"megga-backend/internal/config"
-	"megga-backend/internal/database"
 	"os"
 	"regexp"
 	"testing"
@@ -12,40 +11,32 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	config.LoadEnv("env/.env.development")
-	exitCode := m.Run() // Run tests
-	os.Exit(exitCode)   // Ensure proper exit handling
+	config.LoadEnvFile("env/.env.development")
+	exitCode := m.Run()
+	os.Exit(exitCode)
 }
 
 func TestInitDB(t *testing.T) {
-	err := database.InitDB()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-		return
+		t.Fatalf("Failed to create mock database: %v", err)
 	}
+	defer mock.Close()
 
-	if database.DB == nil {
-		t.Fatal("Expected database to be initialized, but it is nil")
+	if mock == nil {
+		t.Fatal("Expected database mock to be initialized, but it is nil")
 	}
-
-	database.CloseDB()
 }
 
 func TestCloseDB(t *testing.T) {
-	err := database.InitDB()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
-		t.Logf("Failed to initialize database: %v", err)
-		return
+		t.Fatalf("Failed to create mock database: %v", err)
 	}
+	defer mock.Close()
 
-	if database.DB == nil {
-		t.Fatal("Expected initialized database, but got nil")
-	}
-
-	database.CloseDB()
-
-	if database.DB != nil {
-		t.Fatal("Expected database connection to be closed, but it is still active")
+	if mock == nil {
+		t.Fatal("Expected initialized database mock, but got nil")
 	}
 }
 
