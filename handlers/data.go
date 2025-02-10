@@ -126,7 +126,11 @@ func GetData(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dataEntries)
+	if len(dataEntries) == 0 {
+		json.NewEncoder(w).Encode([]models.Data{})
+	} else {
+		json.NewEncoder(w).Encode(dataEntries)
+	}
 }
 
 func GetDataByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
