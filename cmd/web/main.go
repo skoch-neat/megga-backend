@@ -16,15 +16,19 @@ import (
 )
 
 func main() {
-	envFile := "env/.env.development"
-	if config.IsProductionMode() {
-		envFile = "env/.env.production"
-	}
-
-	config.LoadAndValidateEnv(envFile)
+	config.LoadAndValidateEnv()
 
 	database.InitDB()
 	defer database.CloseDB()
+
+	// ✅ One-time initial fetch for BLS data
+	log.Println("🛠️ Initializing BLS data...")
+	err := services.FetchLatestBLSData(database.DB)
+	if err != nil {
+		log.Printf("❌ Error initializing BLS data: %v", err)
+	} else {
+		log.Println("✅ BLS data initialized successfully!")
+	}
 
 	cognitoConfig := middleware.CognitoConfig{
 		UserPoolID: os.Getenv("COGNITO_USER_POOL_ID"),
@@ -47,19 +51,19 @@ func main() {
 
 	routes.RegisterRoutes(router, database.DB)
 
+	// ✅ Periodic BLS Data Fetcher (delayed first execution)
 	go func() {
-		log.Println("🔄 Starting BLS Data Fetcher...")
+		log.Println("⏳ Scheduling first BLS data fetch in 24 hours...")
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ticker.C:
-				log.Println("🔄 Fetching latest BLS data...")
-				err := services.FetchLatestBLSData(database.DB)
-				if err != nil {
-					log.Printf("❌ Error fetching BLS data: %v", err)
-				}
+		for range ticker.C {
+			log.Println("🔄 Fetching latest BLS data...")
+			err := services.FetchLatestBLSData(database.DB)
+			if err != nil {
+				log.Printf("❌ Error fetching BLS data: %v", err)
+			} else {
+				log.Println("✅ Successfully updated BLS data.")
 			}
 		}
 	}()
@@ -68,6 +72,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	port = "8080"
 
 	log.Println("📌 Registered Routes:")
 	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
