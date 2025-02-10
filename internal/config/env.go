@@ -58,11 +58,11 @@ func LoadAndValidateEnv() {
 }
 
 func LoadEnv(envFile string) {
-	loadEnvFile(".env")
-	loadEnvFile(envFile)
+	LoadEnvFile(".env")
+	LoadEnvFile(envFile)
 }
 
-func loadEnvFile(envFile string) {
+func LoadEnvFile(envFile string) {
 	err := godotenv.Load(envFile)
 	if (IsDevelopmentMode()) {
 		if err != nil {
