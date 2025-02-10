@@ -35,16 +35,21 @@ func main() {
 
 	router := mux.NewRouter()
 
+	// ✅ Handle Preflight Requests (OPTIONS) before applying middleware
 	router.Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", frontendURL)
+		w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all for now (change to frontendURL if needed)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// ✅ Apply CORS Middleware
 	router.Use(middleware.CORSConfig(frontendURL))
+
+	// ✅ Apply Cognito Token Validation Middleware
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
+	// ✅ Register Routes
 	routes.RegisterRoutes(router, database.DB)
 
 	go func() {
@@ -52,14 +57,11 @@ func main() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ticker.C:
-				log.Println("🔄 Fetching latest BLS data...")
-				err := services.FetchLatestBLSData(database.DB)
-				if err != nil {
-					log.Printf("❌ Error fetching BLS data: %v", err)
-				}
+		for range ticker.C {
+			log.Println("🔄 Fetching latest BLS data...")
+			err := services.FetchLatestBLSData(database.DB)
+			if err != nil {
+				log.Printf("❌ Error fetching BLS data: %v", err)
 			}
 		}
 	}()
