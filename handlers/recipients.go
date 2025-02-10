@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"megga-backend/internal/models"
 	"megga-backend/internal/database"
+	"megga-backend/internal/models"
 	"net/http"
 	"strconv"
 
@@ -41,8 +41,8 @@ func CreateRecipient(w http.ResponseWriter, r *http.Request, db database.DBQueri
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":    "Recipient created successfully",
-		"recipient":  recipient,
+		"message":   "Recipient created successfully",
+		"recipient": recipient,
 	})
 }
 
@@ -72,7 +72,11 @@ func GetRecipients(w http.ResponseWriter, r *http.Request, db database.DBQuerier
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(recipients)
+	if len(recipients) == 0 {
+		json.NewEncoder(w).Encode([]models.Recipient{})
+	} else {
+		json.NewEncoder(w).Encode(recipients)
+	}
 }
 
 func GetRecipientByID(w http.ResponseWriter, r *http.Request, db database.DBQuerier) {
