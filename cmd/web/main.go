@@ -21,7 +21,6 @@ func main() {
 	database.InitDB()
 	defer database.CloseDB()
 
-	// ✅ Fetch BLS data and schedule updates every 24 hours
 	go func() {
 		log.Println("⏳ Fetching BLS data now, then scheduling updates every 24 hours...")
 		err := services.FetchLatestBLSData(database.DB)
@@ -31,12 +30,10 @@ func main() {
 			log.Println("✅ BLS data initialized successfully!")
 		}
 
-		log.Println("🔄 Fetching latest BLS data...")
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			log.Println("🔄 Fetching latest BLS data...")
 			err := services.FetchLatestBLSData(database.DB)
 			if err != nil {
 				log.Printf("❌ Error fetching BLS data: %v", err)
@@ -65,32 +62,26 @@ func main() {
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 	routes.RegisterRoutes(router, database.DB)
 
-	log.Println("📌 Registered Routes:")
-	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-		path, err := route.GetPathTemplate()
-		if err == nil {
-			methods, _ := route.GetMethods()
-			log.Printf("🔹 %s %s", methods, path)
-		}
-		return nil
-	})
-
-	log.Println("📌 Registered Routes:")
-	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-		path, err := route.GetPathTemplate()
-		if err == nil {
-			methods, _ := route.GetMethods()
-			log.Printf("🔹 %s %s", methods, path)
-		}
-		return nil
-	})
+	if config.IsDevelopmentMode() {
+		log.Println("📌 Registered Routes:")
+		router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+			path, err := route.GetPathTemplate()
+			if err == nil {
+				methods, _ := route.GetMethods()
+				log.Printf("🔹 %s %s", methods, path)
+			}
+			return nil
+		})
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 		log.Println("⚠️ PORT is not set, using default: ", port)
 	} else {
-		log.Println("✅ PORT is set to: ", port)
+		if config.IsDevelopmentMode() {
+			log.Println("✅ PORT is set to: ", port)
+		}
 	}
 
 	addr := fmt.Sprintf(":%s", port)
