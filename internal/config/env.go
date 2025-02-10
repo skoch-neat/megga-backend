@@ -9,6 +9,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
+func init() {
+	LoadEnv("env/.env.development")
+}
+
 func IsDevelopmentMode() bool {
 	return os.Getenv("APP_ENV") == "development"
 }
@@ -38,8 +42,18 @@ func GetMockJWT() string {
 	return mockJWT
 }
 
-func LoadAndValidateEnv(envFile string) {
+func LoadAndValidateEnv() {
+	env := os.Getenv("APP_ENV")
+	envFile := ".env.development"
+
+	if env == "production" {
+		envFile = ".env.production"
+	} else if env == "" {
+		log.Println("⚠️ APP_ENV is not set, using default .env.development")
+	}
+
 	LoadEnv(envFile)
+
 	ValidateEnv()
 }
 
