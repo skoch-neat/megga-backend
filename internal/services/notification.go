@@ -1,14 +1,11 @@
 package services
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"megga-backend/internal/database"
 	"megga-backend/internal/models"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,23 +19,18 @@ type EmailPayload struct {
 	Body      string `json:"body"`
 }
 
-func SendNotifications(db database.DBQuerier, threshold models.Threshold, dataName string, percentChange float64) {
-	log.Println("📨 Preparing notifications for threshold ID:", threshold.ThresholdID)
+func SendNotifications(threshold models.Threshold, dataName string, percentChange float64, recipients []models.Recipient, userEmail string) {
+	log.Println("📨 Preparing mock notifications for threshold ID:", threshold.ThresholdID)
 
-	recipients, err := fetchRecipientsForThreshold(db, threshold.ThresholdID) // ✅ Pass db here
-	if err != nil {
-		log.Printf("❌ Failed to fetch recipients for threshold %d: %v", threshold.ThresholdID, err)
-		return
-	}
-
-	thresholdExceeded := percentChange > threshold.ThresholdValue
-	emailTemplate := "recipient_notification_negative.txt"
-	if !thresholdExceeded {
-		emailTemplate = "recipient_notification_positive.txt"
-	}
-
-	// ✅ Send recipient notifications if applicable
 	if len(recipients) > 0 {
+		thresholdExceeded := percentChange > threshold.ThresholdValue
+		var emailTemplate string
+		if thresholdExceeded {
+			emailTemplate = "recipient_notification_bad.txt"
+		} else {
+			emailTemplate = "recipient_notification_good.txt"
+		}
+
 		for _, recipient := range recipients {
 			subject := fmt.Sprintf("Urgent: %s Economic Data Alert", dataName)
 			message, err := formatEmailFromTemplate(emailTemplate, map[string]string{
@@ -53,18 +45,14 @@ func SendNotifications(db database.DBQuerier, threshold models.Threshold, dataNa
 				log.Printf("❌ Error formatting recipient email: %v", err)
 				continue
 			}
-			sendEmail(recipient.Email, subject, message)
+
+			log.Printf("📧 [MOCK EMAIL] To: %s | Subject: %s", recipient.Email, subject)
+			log.Println("📧 Email Body:")
+			log.Println(message)
 		}
 	}
 
-	// ✅ Send user notification if opted in
 	if threshold.NotifyUser {
-		userEmail := fetchUserEmail(threshold.UserID)
-		if userEmail == "" {
-			log.Printf("❌ User email not found for User ID %d, skipping user notification", threshold.UserID)
-			return
-		}
-
 		userMessage, err := formatEmailFromTemplate("user_notification.txt", map[string]string{
 			"User First Name":   os.Getenv("SENDER_FIRST_NAME"),
 			"Threshold Name":    dataName,
@@ -78,15 +66,49 @@ func SendNotifications(db database.DBQuerier, threshold models.Threshold, dataNa
 			log.Printf("❌ Error formatting user email: %v", err)
 			return
 		}
-		sendEmail(userEmail, "Your MEGGA Threshold Was Hit - Here's What to Do Next", userMessage)
+
+		log.Printf("📧 [MOCK EMAIL] To: %s | Subject: %s", userEmail, "Your MEGGA Threshold Was Hit - Here's What to Do Next")
+		log.Println("📧 Email Body:")
+		log.Println(userMessage)
 	}
 }
 
-// fetchRecipientsForThreshold retrieves all recipients tied to a threshold.
+func formatRecipientList(recipients []models.Recipient) string {
+	var recipientList strings.Builder
+	for _, r := range recipients {
+		recipientList.WriteString(fmt.Sprintf("%s %s <%s>\n", r.FirstName, r.LastName, r.Email))
+	}
+	return recipientList.String()
+}
+
+func determineChangeDirection(percentChange, thresholdValue float64) (direction string) {
+	if percentChange > thresholdValue {
+		direction = "bad"
+	} else {
+		direction = "good"
+	}
+	return
+}
+
+func formatEmailFromTemplate(templateFile string, replacements map[string]string) (string, error) {
+	templatePath := filepath.Clean(filepath.Join("internal", "services", "email_templates", templateFile))
+
+	content, err := os.ReadFile(templatePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read email template %s: %w", templateFile, err)
+	}
+
+	message := string(content)
+	for placeholder, value := range replacements {
+		message = strings.ReplaceAll(message, "["+placeholder+"]", value)
+	}
+	return message, nil
+}
+
 func fetchRecipientsForThreshold(db database.DBQuerier, thresholdID int) ([]models.Recipient, error) {
 	var recipients []models.Recipient
-	rows, err := db.Query(context.Background(), `
-		SELECT r.recipient_id, r.email, r.first_name, r.last_name, r.designation
+	rows, err := db.Query(context.Background(),
+		`SELECT r.recipient_id, r.email, r.first_name, r.last_name, r.designation
 		FROM recipients r
 		JOIN threshold_recipients tr ON r.recipient_id = tr.recipient_id
 		WHERE tr.threshold_id = $1`, thresholdID)
@@ -102,92 +124,15 @@ func fetchRecipientsForThreshold(db database.DBQuerier, thresholdID int) ([]mode
 		}
 		recipients = append(recipients, recipient)
 	}
-
-	log.Printf("✅ Fetched %d recipients for threshold ID: %d", len(recipients), thresholdID)
 	return recipients, nil
 }
 
-// fetchUserEmail retrieves the user's email address based on user ID.
-func fetchUserEmail(userID int) string {
+func fetchUserEmail(db database.DBQuerier, userID int) string {
 	var email string
-	err := database.DB.QueryRow(context.Background(), "SELECT email FROM users WHERE user_id = $1", userID).Scan(&email)
+	err := db.QueryRow(context.Background(), "SELECT email FROM users WHERE user_id = $1", userID).Scan(&email)
 	if err != nil {
 		log.Printf("❌ Failed to fetch user email for user ID %d: %v", userID, err)
 		return ""
 	}
 	return email
-}
-
-// formatRecipientList formats the recipient list into a readable string.
-func formatRecipientList(recipients []models.Recipient) string {
-	var recipientList string
-	for _, r := range recipients {
-		recipientList += fmt.Sprintf("%s %s <%s>\n", r.FirstName, r.LastName, r.Email)
-	}
-	return recipientList
-}
-
-// determineChangeDirection determines whether the threshold change is good or bad.
-func determineChangeDirection(percentChange, thresholdValue float64) string {
-	if percentChange > thresholdValue {
-		return "bad"
-	}
-	return "good"
-}
-
-// formatEmailFromTemplate reads an email template and replaces placeholders with actual values.
-func formatEmailFromTemplate(templateFile string, replacements map[string]string) (string, error) {
-	templatePath := filepath.Join("internal", "services", "email_templates", templateFile)
-	content, err := os.ReadFile(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read email template: %w", err)
-	}
-
-	message := string(content)
-	for placeholder, value := range replacements {
-		message = strings.ReplaceAll(message, "["+placeholder+"]", value)
-	}
-	return message, nil
-}
-
-// sendEmail sends an email using the Testmail.app API.
-func sendEmail(to, subject, body string) error {
-	apiKey := os.Getenv("TESTMAIL_API_KEY")
-	namespace := os.Getenv("TESTMAIL_NAMESPACE")
-
-	if apiKey == "" || namespace == "" {
-		log.Println("❌ Missing Testmail.app API credentials. Check TESTMAIL_API_KEY and TESTMAIL_NAMESPACE.")
-		return fmt.Errorf("missing Testmail.app API credentials")
-	}
-
-	emailPayload := EmailPayload{
-		APIKey:    apiKey,
-		Namespace: namespace,
-		To:        to,
-		Subject:   subject,
-		Body:      body,
-	}
-
-	jsonData, err := json.Marshal(emailPayload)
-	if err != nil {
-		log.Printf("❌ Failed to marshal email payload: %v", err)
-		return err
-	}
-
-	apiURL := "https://api.testmail.app/api/json/send"
-
-	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Printf("❌ Failed to send email to %s: %v", to, err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("⚠️ Email request returned non-200 status code: %d", resp.StatusCode)
-		return fmt.Errorf("email request failed with status code: %d", resp.StatusCode)
-	}
-
-	log.Printf("📧 Successfully sent email to %s with subject: %s", to, subject)
-	return nil
 }
