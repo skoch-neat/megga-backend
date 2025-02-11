@@ -65,7 +65,6 @@ func main() {
 		if config.IsDevelopmentMode() {
 			log.Println("✅ DEBUG: Handling global CORS preflight request (OPTIONS)")
 		}
-		frontendURL := os.Getenv("FRONTEND_URL")
 		w.Header().Set("Access-Control-Allow-Origin", frontendURL)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
