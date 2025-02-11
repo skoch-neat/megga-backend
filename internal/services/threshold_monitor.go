@@ -30,12 +30,10 @@ func MonitorThresholds(db database.DBQuerier) {
 			continue
 		}
 
-		for _, threshold := range thresholds {
-			dataIDStr := utils.ConvertIntToString(threshold.DataID)
-			if _, exists := config.BLS_SERIES_INFO[dataIDStr]; !exists {
-				log.Printf("⚠️ Skipping Data ID %d as it is not in BLS_SERIES_INFO", threshold.DataID)
-				continue
-			}
+		dataIDStr := utils.ConvertIntToString(threshold.DataID)
+		if _, exists := config.BLS_SERIES_INFO[dataIDStr]; !exists {
+			log.Printf("⚠️ Skipping Data ID %d as it is not in BLS_SERIES_INFO", threshold.DataID)
+			continue
 		}
 
 		percentChange := utils.CalculatePercentChange(threshold.ThresholdValue, latestValue)
@@ -50,7 +48,15 @@ func MonitorThresholds(db database.DBQuerier) {
 
 			log.Printf("🔍 Calculated percent change for Data ID %d: %.2f%%", threshold.DataID, percentChange)
 
-			SendNotifications(db, threshold, dataName, percentChange) // ✅ Ensure `db` is passed correctly
+			recipients, err := fetchRecipientsForThreshold(db, threshold.ThresholdID)
+			if err != nil {
+				log.Printf("❌ Failed to fetch recipients for Threshold ID %d: %v", threshold.ThresholdID, err)
+				continue
+			}
+
+			userEmail := fetchUserEmail(db, threshold.UserID)
+
+			SendNotifications(threshold, dataName, percentChange, recipients, userEmail)
 		}
 	}
 }
