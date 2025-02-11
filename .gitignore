@@ -50,10 +50,6 @@ vendor/
 
 # Environment & Secrets
 .env
-env/
-env/.env.production
-env/.env.development
-config/.env
 secrets.json
 credentials.json
 *.key

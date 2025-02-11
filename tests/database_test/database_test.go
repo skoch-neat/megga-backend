@@ -11,7 +11,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	config.LoadEnvFile("env/.env.development")
+	config.LoadEnv()
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }

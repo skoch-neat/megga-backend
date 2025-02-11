@@ -10,15 +10,11 @@ import (
 )
 
 func init() {
-	LoadEnv("env/.env.development")
+	LoadEnv()
 }
 
 func IsDevelopmentMode() bool {
 	return os.Getenv("APP_ENV") == "development"
-}
-
-func IsProductionMode() bool {
-	return os.Getenv("APP_ENV") == "production"
 }
 
 func GetMockJWT() string {
@@ -43,32 +39,17 @@ func GetMockJWT() string {
 }
 
 func LoadAndValidateEnv() {
-	env := os.Getenv("APP_ENV")
-	envFile := ".env.development"
-
-	if env == "production" {
-		envFile = ".env.production"
-	} else if env == "" {
-		log.Println("⚠️ APP_ENV is not set, using default .env.development")
-	}
-
-	LoadEnv(envFile)
-
+	LoadEnv()
 	ValidateEnv()
 }
 
-func LoadEnv(envFile string) {
-	LoadEnvFile(".env")
-	LoadEnvFile(envFile)
-}
-
-func LoadEnvFile(envFile string) {
-	err := godotenv.Load(envFile)
+func LoadEnv() {
+	err := godotenv.Load(".env")
 	if (IsDevelopmentMode()) {
 		if err != nil {
-			log.Printf("⚠️ No %s file found, using system environment variables", envFile)
+			log.Printf("⚠️ No .env file found, using system environment variables")
 		} else {
-			log.Printf("✅ Loaded environment variables from %s", envFile)
+			log.Printf("✅ Loaded environment variables from .env")
 		}
 	}
 }

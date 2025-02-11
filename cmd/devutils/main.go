@@ -9,10 +9,7 @@ import (
 )
 
 func main() {
-	envFile := "env/.env.development"
-	if config.IsProductionMode() {
-		envFile = "env/.env.production"
-	}
+	envFile := ".env"
 
 	log.Printf("🔍 Loading environment variables from: %s", envFile)
 	config.LoadAndValidateEnv()
