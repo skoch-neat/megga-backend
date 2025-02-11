@@ -67,8 +67,6 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	router.Use(middleware.CORSConfig(frontendURL))
-
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
 	routes.RegisterRoutes(router, database.DB)
