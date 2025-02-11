@@ -91,11 +91,15 @@ func determineChangeDirection(percentChange, thresholdValue float64) (direction 
 }
 
 func formatEmailFromTemplate(templateFile string, replacements map[string]string) (string, error) {
-	templatePath := filepath.Clean(filepath.Join("internal", "services", "email_templates", templateFile))
+	projectRoot := findProjectRoot()
+
+	templatePath := filepath.Join(projectRoot, "internal", "templates", templateFile)
+
+	log.Printf("📂 Checking email template at: %s", templatePath)
 
 	content, err := os.ReadFile(templatePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read email template %s: %w", templateFile, err)
+		return "", fmt.Errorf("failed to read email template %s: %w", templatePath, err)
 	}
 
 	message := string(content)
@@ -135,4 +139,23 @@ func fetchUserEmail(db database.DBQuerier, userID int) string {
 		return ""
 	}
 	return email
+}
+
+func findProjectRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("❌ Failed to get working directory: %v", err)
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir { // If we've reached the root
+			log.Fatalf("❌ Could not find project root! Run tests from within the project.")
+		}
+		dir = parent
+	}
 }

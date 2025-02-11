@@ -26,13 +26,18 @@ func MonitorThresholds(db database.DBQuerier) {
 		log.Printf("🔍 Fetching latest value for Data ID: %d", threshold.DataID)
 		latestValue, err := fetchLatestDataValue(db, threshold.DataID)
 		if err != nil {
-			log.Printf("❌ Error fetching latest value for data ID %d: %v", threshold.DataID, err)
+			log.Printf("❌ Error fetching latest value for Data ID %d: %v", threshold.DataID, err)
 			continue
 		}
 
-		dataIDStr := utils.ConvertIntToString(threshold.DataID)
-		if _, exists := config.BLS_SERIES_INFO[dataIDStr]; !exists {
-			log.Printf("⚠️ Skipping Data ID %d as it is not in BLS_SERIES_INFO", threshold.DataID)
+		seriesID, err := fetchSeriesIDForData(db, threshold.DataID)
+		if err != nil {
+			log.Printf("❌ Error fetching series ID for Data ID %d: %v", threshold.DataID, err)
+			continue
+		}
+
+		if _, exists := config.BLS_SERIES_INFO[seriesID]; !exists {
+			log.Printf("⚠️ Skipping Data ID %d as its series ID is not in BLS_SERIES_INFO", threshold.DataID)
 			continue
 		}
 
@@ -50,10 +55,9 @@ func MonitorThresholds(db database.DBQuerier) {
 
 			recipients, err := fetchRecipientsForThreshold(db, threshold.ThresholdID)
 			if err != nil {
-				log.Printf("❌ Failed to fetch recipients for Threshold ID %d: %v", threshold.ThresholdID, err)
+				log.Printf("❌ Error fetching recipients for Threshold ID %d: %v", threshold.ThresholdID, err)
 				continue
 			}
-
 			userEmail := fetchUserEmail(db, threshold.UserID)
 
 			SendNotifications(threshold, dataName, percentChange, recipients, userEmail)
@@ -97,4 +101,13 @@ func fetchLatestDataValue(db database.DBQuerier, dataID int) (float64, error) {
 		return 0, err
 	}
 	return latestValue, nil
+}
+
+func fetchSeriesIDForData(db database.DBQuerier, dataID int) (string, error) {
+	var seriesID string
+	err := db.QueryRow(context.Background(), "SELECT series_id FROM data WHERE data_id = $1", dataID).Scan(&seriesID)
+	if err != nil {
+		return "", err
+	}
+	return seriesID, nil
 }
