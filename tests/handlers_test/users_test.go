@@ -265,6 +265,8 @@ func TestDeleteAllThresholdsForUser_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
+	mock.ExpectBegin()
+
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM threshold_recipients WHERE threshold_id IN (SELECT threshold_id FROM thresholds WHERE user_id = $1)`)).
 		WithArgs(1).
 		WillReturnResult(pgxmock.NewResult("DELETE", 2))
@@ -282,6 +284,10 @@ func TestDeleteAllThresholdsForUser_Success(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Unmet mock expectations: %v", err)
 	}
 }
 
