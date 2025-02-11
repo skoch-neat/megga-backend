@@ -15,7 +15,7 @@ func TestFetchBLSData_Timeout(t *testing.T) {
 	}
 	defer mock.Close()
 
-	err = services.FetchLatestBLSData(mock) // Simulate timeout
+	err = services.FetchLatestBLSData(mock)
 	if err == nil {
 		t.Errorf("Expected timeout error, got nil")
 	}

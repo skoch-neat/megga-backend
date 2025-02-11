@@ -61,7 +61,6 @@ func main() {
 
 	router := mux.NewRouter()
 
-	// 🔴 Ensure OPTIONS requests are handled before anything else
 	router.PathPrefix("/").Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if config.IsDevelopmentMode() {
 			log.Println("✅ DEBUG: Handling global CORS preflight request (OPTIONS)")
@@ -74,13 +73,10 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	// 🔴 Handle CORS Preflight Requests Globally
 	router.Use(middleware.CORSConfig(frontendURL))
 
-	// ✅ Apply authentication middleware
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
-	// ✅ Register application routes
 	routes.RegisterRoutes(router, database.DB)
 
 	if config.IsDevelopmentMode() {

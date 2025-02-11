@@ -17,13 +17,11 @@ func CORSConfig(frontendURL string) func(http.Handler) http.Handler {
 				log.Printf("🔍 DEBUG: MethodOptions = %s", http.MethodOptions)
 			}
 
-			// 🔴 Set CORS headers for ALL responses
 			w.Header().Set("Access-Control-Allow-Origin", frontendURL)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-			// ✅ Explicitly handle preflight (OPTIONS) requests
 			if r.Method == http.MethodOptions {
 				if config.IsDevelopmentMode() {
 					log.Println("✅ DEBUG: Handling CORS preflight request (OPTIONS)")
@@ -32,7 +30,6 @@ func CORSConfig(frontendURL string) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Apply normal CORS middleware for other requests
 			cors.New(cors.Options{
 				AllowedOrigins:   []string{frontendURL},
 				AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

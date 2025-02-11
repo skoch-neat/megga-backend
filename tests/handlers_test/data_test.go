@@ -70,7 +70,6 @@ func TestCreateData_InvalidBody(t *testing.T) {
 	}
 }
 
-// ✅ Test invalid series_id
 func TestCreateData_InvalidSeriesID(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -95,7 +94,6 @@ func TestCreateData_InvalidSeriesID(t *testing.T) {
 	}
 }
 
-// ✅ Test negative latest_value
 func TestCreateData_NegativeValue(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -185,7 +183,6 @@ func TestDeleteData(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM data WHERE data_id = $1")).
-		WithArgs(99). // ✅ Ensure it matches a non-existent ID
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	req := httptest.NewRequest(http.MethodDelete, "/data/99", nil)

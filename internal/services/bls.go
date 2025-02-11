@@ -15,7 +15,6 @@ import (
 	"megga-backend/internal/database"
 )
 
-// BLS API URL
 var BLS_API_URL = getBLSAPIURL()
 var BLS_API_KEY = getBLSAPIKey()
 
@@ -43,7 +42,6 @@ func getBLSAPIKey() string {
 	return blsAPIKey
 }
 
-// Structs to parse API response
 type BLSResponse struct {
 	Status  string `json:"status"`
 	Results struct {
@@ -58,7 +56,6 @@ type BLSResponse struct {
 	} `json:"Results"`
 }
 
-// ParseBLSResponse parses JSON response from BLS API
 func ParseBLSResponse(body []byte) (map[string]struct {
 	Value  float64
 	Year   string

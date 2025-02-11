@@ -53,7 +53,7 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 
 	defer func() {
 		if p := recover(); p != nil {
-			tx.Rollback(context.Background()) // Ensure rollback on panic
+			tx.Rollback(context.Background())
 			log.Printf("❌ Transaction panicked: %v", p)
 		} else if err != nil {
 			log.Println("🔄 Rolling back transaction due to error:", err)
@@ -125,7 +125,7 @@ func SaveBLSData(db database.DBQuerier, blsData map[string]struct {
 
 	if !changesMade {
 		log.Println("🔄 No updates were made, rolling back transaction.")
-		return tx.Rollback(context.Background()) // ✅ Return rollback instead of commit
+		return tx.Rollback(context.Background())
 	}
 
 	if err := tx.Commit(context.Background()); err != nil {

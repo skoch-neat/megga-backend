@@ -152,7 +152,7 @@ func TestGetUserByEmail_Success(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
 	req.Header.Set("X-User-Email", "test@example.com")
 	req.Header.Set("X-User-FirstName", "TestFirst")
-	req.Header.Set("X-User-LastName", "TestLast") // ✅ Inject claims as headers
+	req.Header.Set("X-User-LastName", "TestLast")
 
 	w := httptest.NewRecorder()
 	router := setupRouterWithMiddleware(mock)
@@ -170,18 +170,15 @@ func TestGetUserByEmail_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	// First query: Check if user exists → returns ErrNoRows (not found)
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT user_id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`)).
 		WithArgs("notfound@example.com").
 		WillReturnError(pgx.ErrNoRows)
 
-	// Second query: Insert new user into the database
 	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO users (email, first_name, last_name) VALUES ($1, $2, $3) RETURNING user_id, email, first_name, last_name`)).
 		WithArgs("notfound@example.com", "TestFirstName", "TestLastName").
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "email", "first_name", "last_name"}).
 			AddRow(3, "notfound@example.com", "TestFirstName", "TestLastName"))
 
-	// Create a request with necessary headers for user creation
 	req := httptest.NewRequest("GET", "/users/notfound@example.com", nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+MOCK_JWT_TOKEN)
@@ -197,7 +194,6 @@ func TestGetUserByEmail_NotFound(t *testing.T) {
 		t.Errorf("Expected status 201 (Created), got %d", w.Code)
 	}
 
-	// Ensure mock expectations are met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unmet mock expectations: %v", err)
 	}
@@ -253,7 +249,7 @@ func TestGetThresholdsForUser_NoThresholds(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/users/1/thresholds", nil)
 	w := httptest.NewRecorder()
-	router := setupRouterWithoutMiddleware(mock) // Ensure you pass the correct router setup
+	router := setupRouterWithoutMiddleware(mock)
 
 	router.ServeHTTP(w, req)
 
@@ -269,7 +265,6 @@ func TestDeleteAllThresholdsForUser_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	mock.ExpectBegin() // Add this before DELETE statements
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM threshold_recipients WHERE threshold_id IN (SELECT threshold_id FROM thresholds WHERE user_id = $1)`)).
 		WithArgs(1).
 		WillReturnResult(pgxmock.NewResult("DELETE", 2))
@@ -278,7 +273,7 @@ func TestDeleteAllThresholdsForUser_Success(t *testing.T) {
 		WithArgs(1).
 		WillReturnResult(pgxmock.NewResult("DELETE", 2))
 
-	mock.ExpectCommit() // Expect commit at the end
+	mock.ExpectCommit()
 
 	req := httptest.NewRequest("DELETE", "/users/1/thresholds", nil)
 	w := httptest.NewRecorder()
