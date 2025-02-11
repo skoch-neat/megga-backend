@@ -53,11 +53,6 @@ func main() {
 		UserPoolID: os.Getenv("COGNITO_USER_POOL_ID"),
 		Region:     os.Getenv("AWS_REGION"),
 	}
-	frontendURL := os.Getenv("FRONTEND_URL")
-
-	if config.IsDevelopmentMode() {
-		log.Printf("🚀 DEBUG: FRONTEND_URL from env = %s", frontendURL)
-	}
 
 	router := mux.NewRouter()
 
@@ -65,15 +60,12 @@ func main() {
 		if config.IsDevelopmentMode() {
 			log.Println("✅ DEBUG: Handling global CORS preflight request (OPTIONS)")
 		}
-		frontendURL := os.Getenv("FRONTEND_URL")
-		w.Header().Set("Access-Control-Allow-Origin", frontendURL)
+		w.Header().Set("Access-Control-Allow-Origin", "https://main.dx8te9t0umpd8.amplifyapp.com")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.WriteHeader(http.StatusNoContent)
 	})
-
-	router.Use(middleware.CORSConfig(frontendURL))
 
 	router.Use(middleware.ValidateCognitoToken(cognitoConfig))
 
