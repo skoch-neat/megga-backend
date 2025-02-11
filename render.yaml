@@ -1,0 +1,19 @@
+services:
+  - name: megga-backend
+    type: web
+    env: go
+    buildCommand: go build -o megga-backend
+    startCommand: ./megga-backend
+    envVars:
+      - key: DATABASE_URI
+        sync: false
+      - key: COGNITO_CLIENT_ID
+        sync: false
+      - key: BLS_API_KEY
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PORT
+        value: "8080"
